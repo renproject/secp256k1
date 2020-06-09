@@ -438,7 +438,49 @@ var _ = Describe("Fn", func() {
 	})
 
 	//
+	// Marshalling
 	//
+
+	It("should be equal after converting to and from bytes", func() {
+		var bs [32]byte
+		var x, y Fn
+
+		for i := 0; i < trials; i++ {
+			x = RandomFn()
+			x.GetB32(bs[:])
+			y.SetB32(bs[:])
+			Expect(y.Eq(&x)).To(BeTrue())
+		}
+	})
+
+	It("should identify bytes that represent invalid private keys", func() {
+		var x Fn
+
+		// The zero element is an invalid private key.
+		bs := [32]byte{}
+		ok := x.SetB32SecKey(bs[:])
+		Expect(ok).To(BeFalse())
+
+		// Elements greater than or equal to N should be marked as invalid.
+		for i := 0; i < trials; i++ {
+			bs := randomOutOfRangeBytes()
+			ok := x.SetB32SecKey(bs[:])
+			Expect(ok).To(BeFalse())
+		}
+
+		// Elements already reduced modulo N should be marked as valid.
+		for i := 0; i < trials; i++ {
+			// NOTE: It is possible that this will be zero, but the probability
+			// is negligible.
+			x = RandomFn()
+			x.GetB32(bs[:])
+			ok := x.SetB32SecKey(bs[:])
+			Expect(ok).To(BeTrue())
+		}
+	})
+
+	//
+	// Miscellaneous
 	//
 
 	It("should be zero after clearing", func() {
@@ -477,7 +519,7 @@ var _ = Describe("Fn", func() {
 		}
 	})
 
-	Specify("", func() {
+	Specify("setting and constructing a big.Int using a field element should be consistent", func() {
 		var x Fn
 		a := new(big.Int)
 
@@ -486,44 +528,6 @@ var _ = Describe("Fn", func() {
 			x.GetInt(a)
 
 			Expect(x.Int().Cmp(a)).To(Equal(0))
-		}
-	})
-
-	It("should be equal after converting to and from bytes", func() {
-		var bs [32]byte
-		var x, y Fn
-
-		for i := 0; i < trials; i++ {
-			x = RandomFn()
-			x.GetB32(bs[:])
-			y.SetB32(bs[:])
-			Expect(y.Eq(&x)).To(BeTrue())
-		}
-	})
-
-	It("should identify bytes that represent invalid private keys", func() {
-		var x Fn
-
-		// The zero element is an invalid private key.
-		bs := [32]byte{}
-		ok := x.SetB32SecKey(bs[:])
-		Expect(ok).To(BeFalse())
-
-		// Elements greater than or equal to N should be marked as invalid.
-		for i := 0; i < trials; i++ {
-			bs := randomOutOfRangeBytes()
-			ok := x.SetB32SecKey(bs[:])
-			Expect(ok).To(BeFalse())
-		}
-
-		// Elements already reduced modulo N should be marked as valid.
-		for i := 0; i < trials; i++ {
-			// NOTE: It is possible that this will be zero, but the probability
-			// is negligible.
-			x = RandomFn()
-			x.GetB32(bs[:])
-			ok := x.SetB32SecKey(bs[:])
-			Expect(ok).To(BeTrue())
 		}
 	})
 

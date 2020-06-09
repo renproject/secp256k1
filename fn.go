@@ -2,9 +2,9 @@ package secp256k1
 
 /*
 
+// NOTE: Requires the gmp c library.
 #define USE_NUM_GMP
 
-// TODO: These should be chosen based on the system architecture, if possible.
 #define HAVE___INT128
 #define USE_SCALAR_4X64
 #define USE_SCALAR_INV_BUILTIN
@@ -21,8 +21,11 @@ import "C"
 import (
 	"crypto/rand"
 	"fmt"
+	"io"
 	"math/big"
 	"unsafe"
+
+	"github.com/renproject/surge"
 )
 
 // Fn represents an element of the field defined by the prime N, where N is the
@@ -115,18 +118,51 @@ func (x *Fn) SetB32SecKey(bs []byte) bool {
 	return int(C.secp256k1_scalar_set_b32_seckey(&x.inner, (*C.uchar)(C.CBytes(bs)))) == 1
 }
 
+// GetB32 stores the bytes of the field element into destination in big endian
+// form.
+func (x Fn) GetB32(dst []byte) {
+	C.secp256k1_scalar_get_b32((*C.uchar)(&dst[0]), &x.inner)
+}
+
+// SizeHint implements the surge.SizeHinter interface.
+func (x Fn) SizeHint() int { return 32 }
+
+// Marshal implements the surge.Marshaler interface.
+func (x Fn) Marshal(w io.Writer, m int) (int, error) {
+	if m < 32 {
+		return m, surge.ErrMaxBytesExceeded
+	}
+
+	var bs [32]byte
+	x.GetB32(bs[:])
+	n, err := w.Write(bs[:])
+
+	return m - n, err
+}
+
+// Unmarshal implements the surge.Unmarshaler interface.
+func (x Fn) Unmarshal(r io.Reader, m int) (int, error) {
+	if m < 32 {
+		return m, surge.ErrMaxBytesExceeded
+	}
+
+	var bs [32]byte
+	n, err := io.ReadFull(r, bs[:])
+	m -= n
+	if err != nil {
+		return m, err
+	}
+	x.SetB32(bs[:])
+
+	return m, nil
+}
+
 // SetUint sets the field element to be equal to the given uint.
 func (x *Fn) SetUint(v uint16) {
 	// TODO: Currently we take a uint16 as an argument because a c uint is only
 	// guaranteed to have at least 16 bits. Consider changing the struct to
 	// have x.inner be [4]uint64 to avoid this potential information loss.
 	C.secp256k1_scalar_set_int(&x.inner, C.uint(v))
-}
-
-// GetB32 stores the bytes of the field element into destination in big endian
-// form.
-func (x Fn) GetB32(dst []byte) {
-	C.secp256k1_scalar_get_b32((*C.uchar)(&dst[0]), &x.inner)
 }
 
 // Add computes the addition of the two field elements and stores the result in
