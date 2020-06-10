@@ -1,13 +1,16 @@
 package secp256k1_test
 
 import (
+	"bytes"
 	"crypto/rand"
 	"math/big"
+	mrand "math/rand"
+
+	"github.com/renproject/secp256k1/testutil"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	. "github.com/renproject/secp256k1"
-	"github.com/renproject/secp256k1/testutil"
 )
 
 var _ = Describe("Fn", func() {
@@ -450,6 +453,72 @@ var _ = Describe("Fn", func() {
 			x.GetB32(bs[:])
 			y.SetB32(bs[:])
 			Expect(y.Eq(&x)).To(BeTrue())
+		}
+	})
+
+	It("should be equal after marshaling and unmarshaling with surge", func() {
+		var bs [32]byte
+		var x, y Fn
+
+		buf := bytes.NewBuffer(bs[:])
+		max := x.SizeHint()
+
+		for i := 0; i < trials; i++ {
+			x = RandomFn()
+
+			buf.Reset()
+			m, err := x.Marshal(buf, max)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(m).To(Equal(0))
+
+			m, err = y.Unmarshal(buf, max)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(m).To(Equal(0))
+
+			Expect(y.Eq(&x)).To(BeTrue())
+		}
+	})
+
+	It("should return an error when marshaling with not enough remaining bytes", func() {
+		var x Fn
+
+		for i := 0; i < trials; i++ {
+			x = RandomFn()
+			max := mrand.Intn(x.SizeHint())
+
+			m, err := x.Marshal(nil, max)
+			Expect(err).To(HaveOccurred())
+			Expect(m).To(Equal(max))
+		}
+	})
+
+	It("should return an error when unmarshaling with not enough remaining bytes", func() {
+		var x Fn
+
+		for i := 0; i < trials; i++ {
+			x = RandomFn()
+
+			max := mrand.Intn(x.SizeHint())
+			m, err := x.Unmarshal(nil, max)
+			Expect(err).To(HaveOccurred())
+			Expect(m).To(Equal(max))
+		}
+	})
+
+	It("should return an error when unmarshaling and the reader returns an error", func() {
+		var bs [1]byte
+		var x Fn
+
+		buf := bytes.NewBuffer(bs[:0])
+		max := x.SizeHint()
+
+		for i := 0; i < trials; i++ {
+			x = RandomFn()
+			buf.Reset()
+
+			m, err := x.Unmarshal(buf, max)
+			Expect(err).To(HaveOccurred())
+			Expect(m).To(Equal(max))
 		}
 	})
 

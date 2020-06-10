@@ -141,7 +141,7 @@ func (x Fn) Marshal(w io.Writer, m int) (int, error) {
 }
 
 // Unmarshal implements the surge.Unmarshaler interface.
-func (x Fn) Unmarshal(r io.Reader, m int) (int, error) {
+func (x *Fn) Unmarshal(r io.Reader, m int) (int, error) {
 	if m < 32 {
 		return m, surge.ErrMaxBytesExceeded
 	}
