@@ -34,11 +34,11 @@ type Fn struct {
 	inner C.secp256k1_scalar
 }
 
-// NewFnFromUint returns a new field element equal to the given unsigned
+// NewFnFromU16 returns a new field element equal to the given unsigned
 // integer.
-func NewFnFromUint(v uint16) Fn {
+func NewFnFromU16(v uint16) Fn {
 	x := Fn{}
-	x.SetUint(v)
+	x.SetU16(v)
 	return x
 }
 
@@ -47,15 +47,15 @@ func NewFnFromUint(v uint16) Fn {
 // Panics: This function will panic if there was an error reading bytes from
 // the random source.
 func RandomFn() Fn {
-	x, err := RandomFnSafe()
+	x, err := RandomFnNoPanic()
 	if err != nil {
 		panic(fmt.Sprintf("could not generate random bytes: %v", err))
 	}
 	return x
 }
 
-// RandomFnSafe returns a random field element or an error.
-func RandomFnSafe() (Fn, error) {
+// RandomFnNoPanic returns a random field element or an error.
+func RandomFnNoPanic() (Fn, error) {
 	var bs [32]byte
 	_, err := rand.Read(bs[:])
 	if err != nil {
@@ -78,24 +78,28 @@ func (x *Fn) Clear() {
 // Int returns a big.Int representation of the field element.
 func (x *Fn) Int() *big.Int {
 	ret := new(big.Int)
-	x.GetInt(ret)
+	x.PutInt(ret)
 	return ret
 }
 
-// GetInt sets the given big.Int to be equal to the field element.
-func (x *Fn) GetInt(dst *big.Int) {
+// PutInt sets the given big.Int to be equal to the field element.
+func (x *Fn) PutInt(dst *big.Int) {
 	var bs [32]byte
-	x.GetB32(bs[:])
+	x.PutB32(bs[:])
 	dst.SetBytes(bs[:])
 }
 
 // SetB32 sets the field element to be equal to the given byte slice,
-// interepreted as big endian. The field element will be reduced modulo N. The
-// argument `overflow` will be non zero if the bytes represented a number
-// greater than or equal to N, and zero otherwise.
+// interepreted as big endian. The field element will be reduced modulo N. This
+// function will return true if the bytes represented a number greater than or
+// equal to N, and false otherwise.
 //
 // Panics: If the byte slice has length less than 32, this function will panic.
 func (x *Fn) SetB32(bs []byte) bool {
+	if len(bs) < 32 {
+		panic(fmt.Sprintf("invalid slice length: length needs to be at least 32, got %v", len(bs)))
+	}
+
 	// 64 bits in case the c representation of an int has 64 bits.
 	var overflow int64
 
@@ -115,12 +119,22 @@ func (x *Fn) SetB32(bs []byte) bool {
 //
 // Panics: If the byte slice has length less than 32, this function will panic.
 func (x *Fn) SetB32SecKey(bs []byte) bool {
+	if len(bs) < 32 {
+		panic(fmt.Sprintf("invalid slice length: length needs to be at least 32, got %v", len(bs)))
+	}
+
 	return int(C.secp256k1_scalar_set_b32_seckey(&x.inner, (*C.uchar)(C.CBytes(bs)))) == 1
 }
 
-// GetB32 stores the bytes of the field element into destination in big endian
+// PutB32 stores the bytes of the field element into destination in big endian
 // form.
-func (x Fn) GetB32(dst []byte) {
+//
+// Panics: If the byte slice has length less than 32, this function will panic.
+func (x Fn) PutB32(dst []byte) {
+	if len(dst) < 32 {
+		panic(fmt.Sprintf("invalid slice length: length needs to be at least 32, got %v", len(dst)))
+	}
+
 	C.secp256k1_scalar_get_b32((*C.uchar)(&dst[0]), &x.inner)
 }
 
@@ -134,7 +148,7 @@ func (x Fn) Marshal(w io.Writer, m int) (int, error) {
 	}
 
 	var bs [32]byte
-	x.GetB32(bs[:])
+	x.PutB32(bs[:])
 	n, err := w.Write(bs[:])
 
 	return m - n, err
@@ -157,8 +171,8 @@ func (x *Fn) Unmarshal(r io.Reader, m int) (int, error) {
 	return m, nil
 }
 
-// SetUint sets the field element to be equal to the given uint.
-func (x *Fn) SetUint(v uint16) {
+// SetU16 sets the field element to be equal to the given uint.
+func (x *Fn) SetU16(v uint16) {
 	// TODO: Currently we take a uint16 as an argument because a c uint is only
 	// guaranteed to have at least 16 bits. Consider changing the struct to
 	// have x.inner be [4]uint64 to avoid this potential information loss.
@@ -168,6 +182,24 @@ func (x *Fn) SetUint(v uint16) {
 // Add computes the addition of the two field elements and stores the result in
 // the receiver.
 func (x *Fn) Add(a, b *Fn) {
+	if a == nil {
+		panic("expected first argument to be not be nil")
+	}
+	if b == nil {
+		panic("expected second argument to be not be nil")
+	}
+
+	x.AddUnsafe(a, b)
+}
+
+// AddUnsafe computes the addition of the two field elements and stores the
+// result in the receiver.
+//
+// Unsafe: If this function receives nil arguments, the behaviour is
+// implementation dependent, because the definition of the NULL pointer in c is
+// implementation dependent. If the NULL pointer and the go nil pointer are the
+// same, then the function will panic.
+func (x *Fn) AddUnsafe(a, b *Fn) {
 	// The c function returns an int that indicates whether there was overflow,
 	// which we ignore.
 	_ = C.secp256k1_scalar_add(&x.inner, &a.inner, &b.inner)
@@ -176,30 +208,109 @@ func (x *Fn) Add(a, b *Fn) {
 // Mul computes the multiplication of the two field elements and stores the
 // result in the receiver.
 func (x *Fn) Mul(a, b *Fn) {
+	if a == nil {
+		panic("expected first argument to be not be nil")
+	}
+	if b == nil {
+		panic("expected second argument to be not be nil")
+	}
+
+	x.MulUnsafe(a, b)
+}
+
+// MulUnsafe computes the multiplication of the two field elements and stores
+// the result in the receiver.
+//
+// Unsafe: If this function receives nil arguments, the behaviour is
+// implementation dependent, because the definition of the NULL pointer in c is
+// implementation dependent. If the NULL pointer and the go nil pointer are the
+// same, then the function will panic.
+func (x *Fn) MulUnsafe(a, b *Fn) {
 	C.secp256k1_scalar_mul(&x.inner, &a.inner, &b.inner)
 }
 
 // Sqr computes the square of the given field element and stores the result in
 // the receiver.
 func (x *Fn) Sqr(a *Fn) {
+	if a == nil {
+		panic("expected first argument to be not be nil")
+	}
+
+	x.SqrUnsafe(a)
+}
+
+// SqrUnsafe computes the square of the given field element and stores the
+// result in the receiver.
+//
+// Unsafe: If this function receives nil arguments, the behaviour is
+// implementation dependent, because the definition of the NULL pointer in c is
+// implementation dependent. If the NULL pointer and the go nil pointer are the
+// same, then the function will panic.
+func (x *Fn) SqrUnsafe(a *Fn) {
 	C.secp256k1_scalar_sqr(&x.inner, &a.inner)
 }
 
 // InverseInvar computes the multiplicative inverse of the given field element
 // using a time invariant algorithm and stores the result in the receiver.
 func (x *Fn) InverseInvar(a *Fn) {
+	if a == nil {
+		panic("expected first argument to be not be nil")
+	}
+
+	x.InverseInvarUnsafe(a)
+}
+
+// InverseInvarUnsafe computes the multiplicative inverse of the given field
+// element using a time invariant algorithm and stores the result in the
+// receiver.
+//
+// Unsafe: If this function receives nil arguments, the behaviour is
+// implementation dependent, because the definition of the NULL pointer in c is
+// implementation dependent. If the NULL pointer and the go nil pointer are the
+// same, then the function will panic.
+func (x *Fn) InverseInvarUnsafe(a *Fn) {
 	C.secp256k1_scalar_inverse(&x.inner, &a.inner)
 }
 
 // Inverse computes the multiplicative inverse of the given field element and
 // stores the result in the receiver.
 func (x *Fn) Inverse(a *Fn) {
+	if a == nil {
+		panic("expected first argument to be not be nil")
+	}
+
+	x.InverseUnsafe(a)
+}
+
+// InverseUnsafe computes the multiplicative inverse of the given field element
+// and stores the result in the receiver.
+//
+// Unsafe: If this function receives nil arguments, the behaviour is
+// implementation dependent, because the definition of the NULL pointer in c is
+// implementation dependent. If the NULL pointer and the go nil pointer are the
+// same, then the function will panic.
+func (x *Fn) InverseUnsafe(a *Fn) {
 	C.secp256k1_scalar_inverse_var(&x.inner, &a.inner)
 }
 
 // Negate computes the additive inverse of the given field element and stores
 // the result in the receiver.
 func (x *Fn) Negate(a *Fn) {
+	if a == nil {
+		panic("expected first argument to be not be nil")
+	}
+
+	x.NegateUnsafe(a)
+}
+
+// NegateUnsafe computes the additive inverse of the given field element and
+// stores the result in the receiver.
+//
+// Unsafe: If this function receives nil arguments, the behaviour is
+// implementation dependent, because the definition of the NULL pointer in c is
+// implementation dependent. If the NULL pointer and the go nil pointer are the
+// same, then the function will panic.
+func (x *Fn) NegateUnsafe(a *Fn) {
 	C.secp256k1_scalar_negate(&x.inner, &a.inner)
 }
 

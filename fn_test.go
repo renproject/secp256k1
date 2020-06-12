@@ -6,11 +6,10 @@ import (
 	"math/big"
 	mrand "math/rand"
 
-	"github.com/renproject/secp256k1/testutil"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	. "github.com/renproject/secp256k1"
+	"github.com/renproject/secp256k1/secp256k1tutil"
 )
 
 var _ = Describe("Fn", func() {
@@ -50,7 +49,7 @@ var _ = Describe("Fn", func() {
 		panic("could not create difference constant")
 	}
 
-	zero, one := NewFnFromUint(0), NewFnFromUint(1)
+	zero, one := NewFnFromU16(0), NewFnFromU16(1)
 
 	// Helper functions
 
@@ -76,11 +75,11 @@ var _ = Describe("Fn", func() {
 		x, y, expected, actual := new(big.Int), new(big.Int), new(big.Int), new(big.Int)
 		for i := 0; i < trials; i++ {
 			a, b = RandomFn(), RandomFn()
-			a.GetInt(x)
-			b.GetInt(y)
+			a.PutInt(x)
+			b.PutInt(y)
 
-			c.Add(&a, &b)
-			c.GetInt(actual)
+			c.AddUnsafe(&a, &b)
+			c.PutInt(actual)
 
 			expected.Add(x, y)
 			expected.Mod(expected, N)
@@ -94,11 +93,11 @@ var _ = Describe("Fn", func() {
 		x, y, expected, actual := new(big.Int), new(big.Int), new(big.Int), new(big.Int)
 		for i := 0; i < trials; i++ {
 			a, b = RandomFn(), RandomFn()
-			a.GetInt(x)
-			b.GetInt(y)
+			a.PutInt(x)
+			b.PutInt(y)
 
-			c.Mul(&a, &b)
-			c.GetInt(actual)
+			c.MulUnsafe(&a, &b)
+			c.PutInt(actual)
 
 			expected.Mul(x, y)
 			expected.Mod(expected, N)
@@ -112,10 +111,10 @@ var _ = Describe("Fn", func() {
 		x, expected, actual := new(big.Int), new(big.Int), new(big.Int)
 		for i := 0; i < trials; i++ {
 			a = RandomFn()
-			a.GetInt(x)
+			a.PutInt(x)
 
-			b.Sqr(&a)
-			b.GetInt(actual)
+			b.SqrUnsafe(&a)
+			b.PutInt(actual)
 
 			expected.Mul(x, x)
 			expected.Mod(expected, N)
@@ -129,10 +128,10 @@ var _ = Describe("Fn", func() {
 		x, expected, actual := new(big.Int), new(big.Int), new(big.Int)
 		for i := 0; i < trials; i++ {
 			a = RandomFn()
-			a.GetInt(x)
+			a.PutInt(x)
 
-			b.Negate(&a)
-			b.GetInt(actual)
+			b.NegateUnsafe(&a)
+			b.PutInt(actual)
 
 			expected.Sub(N, x)
 
@@ -145,10 +144,10 @@ var _ = Describe("Fn", func() {
 		x, expected, actual := new(big.Int), new(big.Int), new(big.Int)
 		for i := 0; i < trials; i++ {
 			a = RandomFn()
-			a.GetInt(x)
+			a.PutInt(x)
 
-			b.Inverse(&a)
-			b.GetInt(actual)
+			b.InverseUnsafe(&a)
+			b.PutInt(actual)
 
 			expected.ModInverse(x, N)
 
@@ -194,7 +193,7 @@ var _ = Describe("Fn", func() {
 
 		for i := 0; i < trials; i++ {
 			x = RandomFn()
-			x.GetInt(a)
+			x.PutInt(a)
 
 			Expect(x.IsEven()).To(Equal(a.Bit(0) == 0))
 		}
@@ -208,7 +207,7 @@ var _ = Describe("Fn", func() {
 
 		for i := 0; i < trials; i++ {
 			x = RandomFn()
-			x.GetInt(a)
+			x.PutInt(a)
 
 			Expect(x.IsHigh()).To(Equal(a.Cmp(N2Int) == 1))
 		}
@@ -224,8 +223,8 @@ var _ = Describe("Fn", func() {
 			x = RandomFn()
 			y = x
 
-			aliased.Add(&x, &x)
-			expected.Add(&x, &y)
+			aliased.AddUnsafe(&x, &x)
+			expected.AddUnsafe(&x, &y)
 
 			Expect(aliased.Eq(&expected)).To(BeTrue())
 		}
@@ -237,8 +236,8 @@ var _ = Describe("Fn", func() {
 			x, y = RandomFn(), RandomFn()
 			aliased = x
 
-			aliased.Add(&aliased, &y)
-			expected.Add(&x, &y)
+			aliased.AddUnsafe(&aliased, &y)
+			expected.AddUnsafe(&x, &y)
 
 			Expect(aliased.Eq(&expected)).To(BeTrue())
 		}
@@ -250,8 +249,8 @@ var _ = Describe("Fn", func() {
 			x, y = RandomFn(), RandomFn()
 			aliased = y
 
-			aliased.Add(&x, &aliased)
-			expected.Add(&x, &y)
+			aliased.AddUnsafe(&x, &aliased)
+			expected.AddUnsafe(&x, &y)
 
 			Expect(aliased.Eq(&expected)).To(BeTrue())
 		}
@@ -264,8 +263,8 @@ var _ = Describe("Fn", func() {
 			y = x
 			aliased = x
 
-			aliased.Add(&aliased, &aliased)
-			expected.Add(&x, &y)
+			aliased.AddUnsafe(&aliased, &aliased)
+			expected.AddUnsafe(&x, &y)
 
 			Expect(aliased.Eq(&expected)).To(BeTrue())
 		}
@@ -277,8 +276,8 @@ var _ = Describe("Fn", func() {
 			x = RandomFn()
 			y = x
 
-			aliased.Mul(&x, &x)
-			expected.Mul(&x, &y)
+			aliased.MulUnsafe(&x, &x)
+			expected.MulUnsafe(&x, &y)
 
 			Expect(aliased.Eq(&expected)).To(BeTrue())
 		}
@@ -290,8 +289,8 @@ var _ = Describe("Fn", func() {
 			x, y = RandomFn(), RandomFn()
 			aliased = x
 
-			aliased.Mul(&aliased, &y)
-			expected.Mul(&x, &y)
+			aliased.MulUnsafe(&aliased, &y)
+			expected.MulUnsafe(&x, &y)
 
 			Expect(aliased.Eq(&expected)).To(BeTrue())
 		}
@@ -303,8 +302,8 @@ var _ = Describe("Fn", func() {
 			x, y = RandomFn(), RandomFn()
 			aliased = y
 
-			aliased.Mul(&x, &aliased)
-			expected.Mul(&x, &y)
+			aliased.MulUnsafe(&x, &aliased)
+			expected.MulUnsafe(&x, &y)
 
 			Expect(aliased.Eq(&expected)).To(BeTrue())
 		}
@@ -317,10 +316,70 @@ var _ = Describe("Fn", func() {
 			y = x
 			aliased = x
 
-			aliased.Mul(&aliased, &aliased)
-			expected.Mul(&x, &y)
+			aliased.MulUnsafe(&aliased, &aliased)
+			expected.MulUnsafe(&x, &y)
 
 			Expect(aliased.Eq(&expected)).To(BeTrue())
+		}
+	})
+
+	//
+	// Panics
+	//
+
+	It("should panic when adding when either argument is nil", func() {
+		var x Fn
+		Expect(func() { x.Add(nil, &Fn{}) }).To(Panic())
+		Expect(func() { x.Add(&Fn{}, nil) }).To(Panic())
+	})
+
+	It("should panic when multiplying when either argument is nil", func() {
+		var x Fn
+		Expect(func() { x.Mul(nil, &Fn{}) }).To(Panic())
+		Expect(func() { x.Mul(&Fn{}, nil) }).To(Panic())
+	})
+
+	It("should panic when squaring when the argument is nil", func() {
+		var x Fn
+		Expect(func() { x.Sqr(nil) }).To(Panic())
+	})
+
+	It("should panic when inverting (invar) when the argument is nil", func() {
+		var x Fn
+		Expect(func() { x.InverseInvar(nil) }).To(Panic())
+	})
+
+	It("should panic when inverting when the argument is nil", func() {
+		var x Fn
+		Expect(func() { x.Inverse(nil) }).To(Panic())
+	})
+
+	It("should panic when negating when the argument is nil", func() {
+		var x Fn
+		Expect(func() { x.Negate(nil) }).To(Panic())
+	})
+
+	It("should panic when setting bytes when the slice length is too small", func() {
+		var x Fn
+		var bs [31]byte
+		for i := 0; i < 31; i++ {
+			Expect(func() { x.SetB32(bs[:i]) }).To(Panic())
+		}
+	})
+
+	It("should panic when setting bytes (seckey) when the slice length is too small", func() {
+		var x Fn
+		var bs [31]byte
+		for i := 0; i < 31; i++ {
+			Expect(func() { x.SetB32SecKey(bs[:i]) }).To(Panic())
+		}
+	})
+
+	It("should panic when putting bytes when the slice length is too small", func() {
+		var x Fn
+		var bs [31]byte
+		for i := 0; i < 31; i++ {
+			Expect(func() { x.PutB32(bs[:i]) }).To(Panic())
 		}
 	})
 
@@ -332,7 +391,7 @@ var _ = Describe("Fn", func() {
 		var y Fn
 		for i := 0; i < trials; i++ {
 			x := RandomFn()
-			y.Add(&x, &zero)
+			y.AddUnsafe(&x, &zero)
 			Expect(y.Eq(&x)).To(BeTrue())
 		}
 	})
@@ -341,7 +400,7 @@ var _ = Describe("Fn", func() {
 		var x, y Fn
 		for i := 0; i < trials; i++ {
 			x = RandomFn()
-			y.Mul(&x, &one)
+			y.MulUnsafe(&x, &one)
 			Expect(y.Eq(&x)).To(BeTrue())
 		}
 	})
@@ -350,7 +409,7 @@ var _ = Describe("Fn", func() {
 		var x, y Fn
 		for i := 0; i < trials; i++ {
 			x = RandomFn()
-			y.Mul(&x, &zero)
+			y.MulUnsafe(&x, &zero)
 			Expect(y.IsZero()).To(BeTrue())
 		}
 	})
@@ -359,8 +418,8 @@ var _ = Describe("Fn", func() {
 		var x, y Fn
 		for i := 0; i < trials; i++ {
 			x = RandomFn()
-			y.Negate(&x)
-			y.Add(&y, &x)
+			y.NegateUnsafe(&x)
+			y.AddUnsafe(&y, &x)
 			Expect(y.IsZero()).To(BeTrue())
 		}
 	})
@@ -375,8 +434,8 @@ var _ = Describe("Fn", func() {
 				continue
 			}
 
-			y.Inverse(&x)
-			y.Mul(&y, &x)
+			y.InverseUnsafe(&x)
+			y.MulUnsafe(&y, &x)
 			Expect(y.IsOne()).To(BeTrue())
 		}
 	})
@@ -391,8 +450,8 @@ var _ = Describe("Fn", func() {
 				continue
 			}
 
-			y.InverseInvar(&x)
-			y.Mul(&y, &x)
+			y.InverseInvarUnsafe(&x)
+			y.MulUnsafe(&y, &x)
 			Expect(y.IsOne()).To(BeTrue())
 		}
 	})
@@ -403,14 +462,14 @@ var _ = Describe("Fn", func() {
 			a, b, c = RandomFn(), RandomFn(), RandomFn()
 
 			// a * (b + c)
-			addMul.Add(&b, &c)
-			addMul.Mul(&addMul, &a)
+			addMul.AddUnsafe(&b, &c)
+			addMul.MulUnsafe(&addMul, &a)
 
 			// a*b + a*c
 			temp := Fn{}
-			mulAdd.Mul(&a, &b)
-			temp.Mul(&a, &c)
-			mulAdd.Add(&mulAdd, &temp)
+			mulAdd.MulUnsafe(&a, &b)
+			temp.MulUnsafe(&a, &c)
+			mulAdd.AddUnsafe(&mulAdd, &temp)
 
 			Expect(addMul.Eq(&mulAdd)).To(BeTrue())
 		}
@@ -421,8 +480,8 @@ var _ = Describe("Fn", func() {
 		for i := 0; i < trials; i++ {
 			a, b = RandomFn(), RandomFn()
 
-			ab.Add(&a, &b)
-			ba.Add(&b, &a)
+			ab.AddUnsafe(&a, &b)
+			ba.AddUnsafe(&b, &a)
 
 			Expect(ab.Eq(&ba)).To(BeTrue())
 		}
@@ -433,8 +492,8 @@ var _ = Describe("Fn", func() {
 		for i := 0; i < trials; i++ {
 			a, b = RandomFn(), RandomFn()
 
-			ab.Mul(&a, &b)
-			ba.Mul(&b, &a)
+			ab.MulUnsafe(&a, &b)
+			ba.MulUnsafe(&b, &a)
 
 			Expect(ab.Eq(&ba)).To(BeTrue())
 		}
@@ -450,7 +509,7 @@ var _ = Describe("Fn", func() {
 
 		for i := 0; i < trials; i++ {
 			x = RandomFn()
-			x.GetB32(bs[:])
+			x.PutB32(bs[:])
 			y.SetB32(bs[:])
 			Expect(y.Eq(&x)).To(BeTrue())
 		}
@@ -542,7 +601,7 @@ var _ = Describe("Fn", func() {
 			// NOTE: It is possible that this will be zero, but the probability
 			// is negligible.
 			x = RandomFn()
-			x.GetB32(bs[:])
+			x.PutB32(bs[:])
 			ok := x.SetB32SecKey(bs[:])
 			Expect(ok).To(BeTrue())
 		}
@@ -566,7 +625,7 @@ var _ = Describe("Fn", func() {
 
 		for i := 0; i < trials; i++ {
 			x.Clear()
-			x, err = RandomFnSafe()
+			x, err = RandomFnNoPanic()
 
 			Expect(err).ToNot(HaveOccurred())
 
@@ -581,10 +640,82 @@ var _ = Describe("Fn", func() {
 		for i := 0; i < trials; i++ {
 			x = RandomFn()
 
-			sqr.Sqr(&x)
-			mul.Mul(&x, &x)
+			sqr.SqrUnsafe(&x)
+			mul.MulUnsafe(&x, &x)
 
 			Expect(sqr.Eq(&mul)).To(BeTrue())
+		}
+	})
+
+	Specify("addition should be the same as the unsafe variant", func() {
+		var x, y, safe, unsafe Fn
+		for i := 0; i < trials; i++ {
+			x, y = RandomFn(), RandomFn()
+
+			safe.Add(&x, &y)
+			unsafe.AddUnsafe(&x, &y)
+
+			Expect(safe.Eq(&unsafe)).To(BeTrue())
+		}
+	})
+
+	Specify("multiplication should be the same as the unsafe variant", func() {
+		var x, y, safe, unsafe Fn
+		for i := 0; i < trials; i++ {
+			x, y = RandomFn(), RandomFn()
+
+			safe.Mul(&x, &y)
+			unsafe.MulUnsafe(&x, &y)
+
+			Expect(safe.Eq(&unsafe)).To(BeTrue())
+		}
+	})
+
+	Specify("squaring should be the same as the unsafe variant", func() {
+		var x, safe, unsafe Fn
+		for i := 0; i < trials; i++ {
+			x = RandomFn()
+
+			safe.Sqr(&x)
+			unsafe.SqrUnsafe(&x)
+
+			Expect(safe.Eq(&unsafe)).To(BeTrue())
+		}
+	})
+
+	Specify("inversion (invar) should be the same as the unsafe variant", func() {
+		var x, safe, unsafe Fn
+		for i := 0; i < trials; i++ {
+			x = RandomFn()
+
+			safe.InverseInvar(&x)
+			unsafe.InverseInvarUnsafe(&x)
+
+			Expect(safe.Eq(&unsafe)).To(BeTrue())
+		}
+	})
+
+	Specify("inversion should be the same as the unsafe variant", func() {
+		var x, safe, unsafe Fn
+		for i := 0; i < trials; i++ {
+			x = RandomFn()
+
+			safe.Inverse(&x)
+			unsafe.InverseUnsafe(&x)
+
+			Expect(safe.Eq(&unsafe)).To(BeTrue())
+		}
+	})
+
+	Specify("negation should be the same as the unsafe variant", func() {
+		var x, safe, unsafe Fn
+		for i := 0; i < trials; i++ {
+			x = RandomFn()
+
+			safe.Negate(&x)
+			unsafe.NegateUnsafe(&x)
+
+			Expect(safe.Eq(&unsafe)).To(BeTrue())
 		}
 	})
 
@@ -594,22 +725,22 @@ var _ = Describe("Fn", func() {
 
 		for i := 0; i < trials; i++ {
 			x = RandomFn()
-			x.GetInt(a)
+			x.PutInt(a)
 
 			Expect(x.Int().Cmp(a)).To(Equal(0))
 		}
 	})
 
 	It("should return an error when there is a read error when safely generating a random field element", func() {
-		testutil.UseErrReader(func() {
-			x, err := RandomFnSafe()
+		secp256k1tutil.UseErrReader(func() {
+			x, err := RandomFnNoPanic()
 			Expect(err).To(HaveOccurred())
 			Expect(x.IsZero()).To(BeTrue())
 		})
 	})
 
 	It("should panic when there is a read error when generating a random field element", func() {
-		testutil.UseErrReader(func() {
+		secp256k1tutil.UseErrReader(func() {
 			Expect(func() { RandomFn() }).To(Panic())
 		})
 	})
