@@ -456,7 +456,7 @@ var _ = Describe("Fn", func() {
 		}
 	})
 
-	Specify("distributivty should hold", func() {
+	Specify("distributivity should hold", func() {
 		var a, b, c, addMul, mulAdd Fn
 		for i := 0; i < trials; i++ {
 			a, b, c = RandomFn(), RandomFn(), RandomFn()
