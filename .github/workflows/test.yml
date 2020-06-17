@@ -14,10 +14,6 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      - name: Configure git for private modules
-        env:
-          PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-        run: git config --global url."https://loongy:${PERSONAL_ACCESS_TOKEN}@github.com".insteadOf "https://github.com"
       - name: Run vetting
         run: |
           cd $GITHUB_WORKSPACE
@@ -40,3 +36,4 @@ jobs:
           export PATH=$PATH:$(go env GOPATH)/bin
           go get -u github.com/mattn/goveralls
           go test --race --cover --coverprofile mpc.coverprofile ./...
+          goveralls -coverprofile=surge.coverprofile -service=circleci -repotoken $COVERALLS_TOKEN
