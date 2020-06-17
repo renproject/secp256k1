@@ -133,7 +133,7 @@ func (x *Fp) SetB32(bs []byte) bool {
 		panic(fmt.Sprintf("invalid slice length: length needs to be at least 32, got %v", len(bs)))
 	}
 
-	greater := int(C.secp256k1_fe_set_b32((*C.secp256k1_fe)(unsafe.Pointer(x)), (*C.uchar)(&bs[0]))) == 0
+	greater := int(C.secp256k1_fe_set_b32((*C.secp256k1_fe)(unsafe.Pointer(&x.inner[0])), (*C.uchar)(&bs[0]))) == 0
 	if greater {
 		x.normalize()
 	}
@@ -151,7 +151,7 @@ func (x Fp) PutB32(dst []byte) {
 	}
 
 	// NOTE: This function assumes that the representation is normalised.
-	C.secp256k1_fe_get_b32((*C.uchar)(&dst[0]), (*C.secp256k1_fe)(unsafe.Pointer(&x)))
+	C.secp256k1_fe_get_b32((*C.uchar)(&dst[0]), (*C.secp256k1_fe)(unsafe.Pointer(&x.inner[0])))
 }
 
 // SizeHint implements the surge.SizeHinter interface.
@@ -215,7 +215,7 @@ func (x *Fp) Add(a, b *Fp) {
 // same, then the function will panic.
 func (x *Fp) AddUnsafe(a, b *Fp) {
 	aCopy := *a
-	C.secp256k1_fe_add((*C.secp256k1_fe)(unsafe.Pointer(&aCopy)), (*C.secp256k1_fe)(unsafe.Pointer(b)))
+	C.secp256k1_fe_add((*C.secp256k1_fe)(unsafe.Pointer(&aCopy.inner[0])), (*C.secp256k1_fe)(unsafe.Pointer(&b.inner[0])))
 	*x = aCopy
 	x.normalize()
 }
@@ -238,7 +238,7 @@ func (x *Fp) AddAssign(a *Fp) {
 // implementation dependent. If the NULL pointer and the go nil pointer are the
 // same, then the function will panic.
 func (x *Fp) AddAssignUnsafe(a *Fp) {
-	C.secp256k1_fe_add((*C.secp256k1_fe)(unsafe.Pointer(x)), (*C.secp256k1_fe)(unsafe.Pointer(a)))
+	C.secp256k1_fe_add((*C.secp256k1_fe)(unsafe.Pointer(&x.inner[0])), (*C.secp256k1_fe)(unsafe.Pointer(&a.inner[0])))
 	x.normalize()
 }
 
@@ -262,7 +262,7 @@ func (x *Fp) Negate(a *Fp) {
 func (x *Fp) NegateUnsafe(a *Fp) {
 	// NOTE: The final argument is set to 0 because it is assumed that the
 	// representation is normalized.
-	C.secp256k1_fe_negate((*C.secp256k1_fe)(unsafe.Pointer(x)), (*C.secp256k1_fe)(unsafe.Pointer(a)), 0)
+	C.secp256k1_fe_negate((*C.secp256k1_fe)(unsafe.Pointer(&x.inner[0])), (*C.secp256k1_fe)(unsafe.Pointer(&a.inner[0])), 0)
 	x.normalize()
 }
 
@@ -296,9 +296,9 @@ func (x *Fp) MulNoAliaseUnsafe(a, b *Fp) {
 	// NOTE: The c function defines the pointer to b as restrict, which means
 	// that it must not be aliased by x or a.
 	C.secp256k1_fe_mul(
-		(*C.secp256k1_fe)(unsafe.Pointer(x)),
-		(*C.secp256k1_fe)(unsafe.Pointer(a)),
-		(*C.secp256k1_fe)(unsafe.Pointer(b)),
+		(*C.secp256k1_fe)(unsafe.Pointer(&x.inner[0])),
+		(*C.secp256k1_fe)(unsafe.Pointer(&a.inner[0])),
+		(*C.secp256k1_fe)(unsafe.Pointer(&b.inner[0])),
 	)
 	x.normalize()
 }
@@ -329,9 +329,9 @@ func (x *Fp) MulUnsafe(a, b *Fp) {
 	// to ensure that there is no aliasing.
 	bCopy := *b
 	C.secp256k1_fe_mul(
-		(*C.secp256k1_fe)(unsafe.Pointer(x)),
-		(*C.secp256k1_fe)(unsafe.Pointer(a)),
-		(*C.secp256k1_fe)(unsafe.Pointer(&bCopy)),
+		(*C.secp256k1_fe)(unsafe.Pointer(&x.inner[0])),
+		(*C.secp256k1_fe)(unsafe.Pointer(&a.inner[0])),
+		(*C.secp256k1_fe)(unsafe.Pointer(&bCopy.inner[0])),
 	)
 	x.normalize()
 }
@@ -354,7 +354,7 @@ func (x *Fp) Sqr(a *Fp) {
 // implementation dependent. If the NULL pointer and the go nil pointer are the
 // same, then the function will panic.
 func (x *Fp) SqrUnsafe(a *Fp) {
-	C.secp256k1_fe_sqr((*C.secp256k1_fe)(unsafe.Pointer(x)), (*C.secp256k1_fe)(unsafe.Pointer(a)))
+	C.secp256k1_fe_sqr((*C.secp256k1_fe)(unsafe.Pointer(&x.inner[0])), (*C.secp256k1_fe)(unsafe.Pointer(&a.inner[0])))
 	x.normalize()
 }
 
@@ -378,7 +378,7 @@ func (x *Fp) Inv(a *Fp) {
 func (x *Fp) InvUnsafe(a *Fp) {
 	// We use the potentially faster but not constant time version of the
 	// inverse function.
-	C.secp256k1_fe_inv_var((*C.secp256k1_fe)(unsafe.Pointer(x)), (*C.secp256k1_fe)(unsafe.Pointer(a)))
+	C.secp256k1_fe_inv_var((*C.secp256k1_fe)(unsafe.Pointer(&x.inner[0])), (*C.secp256k1_fe)(unsafe.Pointer(&a.inner[0])))
 	x.normalize()
 }
 
@@ -407,5 +407,5 @@ func (x *Fp) Eq(other *Fp) bool {
 }
 
 func (x *Fp) normalize() {
-	C.secp256k1_fe_normalize_var((*C.secp256k1_fe)(unsafe.Pointer(x)))
+	C.secp256k1_fe_normalize_var((*C.secp256k1_fe)(unsafe.Pointer(&x.inner[0])))
 }
