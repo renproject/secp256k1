@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-	"unsafe"
 
 	"github.com/renproject/surge"
 )
@@ -101,13 +100,9 @@ func (x *Fn) SetB32(bs []byte) bool {
 	}
 
 	// 64 bits in case the c representation of an int has 64 bits.
-	var overflow int64
+	var overflow C.int
 
-	C.secp256k1_scalar_set_b32(
-		&x.inner,
-		(*C.uchar)(&bs[0]),
-		(*C.int)(unsafe.Pointer(&overflow)),
-	)
+	C.secp256k1_scalar_set_b32(&x.inner, (*C.uchar)(&bs[0]), &overflow)
 	return overflow != 0
 }
 
