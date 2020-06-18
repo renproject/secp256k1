@@ -33,7 +33,6 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-	"unsafe"
 
 	"github.com/renproject/surge"
 )
@@ -41,7 +40,7 @@ import (
 // Fp represents an element of the field corresponding to the coordinates of
 // the points that lie on the secp256k1 elliptic curve.
 type Fp struct {
-	inner [5]uint64
+	inner C.secp256k1_fe
 }
 
 // NewFpFromU64 returns a new field element equal to the given unsigned
@@ -60,11 +59,11 @@ func (x *Fp) SetU64(v uint64) {
 	// Each limb should have no more than 52 nonzero bits when normalized, so
 	// we need to put the lower 52 bits of the argument in the first limb, and
 	// the higher 12 bits in the second limb.
-	x.inner[0] = v & 0xFFFFFFFFFFFFF
-	x.inner[1] = v >> 52
-	x.inner[2] = 0
-	x.inner[3] = 0
-	x.inner[4] = 0
+	x.inner.n[0] = C.uint64_t(v) & 0xFFFFFFFFFFFFF
+	x.inner.n[1] = C.uint64_t(v) >> 52
+	x.inner.n[2] = 0
+	x.inner.n[3] = 0
+	x.inner.n[4] = 0
 }
 
 // RandomFp returns a random Fp field element.
@@ -101,11 +100,11 @@ func RandomFpNoPanic() (Fp, error) {
 func (x *Fp) Clear() {
 	// Don't call out to c here as the implementation is simple enough to
 	// warrant avoiding the FFI overhead.
-	x.inner[0] = 0
-	x.inner[1] = 0
-	x.inner[2] = 0
-	x.inner[3] = 0
-	x.inner[4] = 0
+	x.inner.n[0] = 0
+	x.inner.n[1] = 0
+	x.inner.n[2] = 0
+	x.inner.n[3] = 0
+	x.inner.n[4] = 0
 }
 
 // Int returns a big.Int representation of the field element.
@@ -133,7 +132,7 @@ func (x *Fp) SetB32(bs []byte) bool {
 		panic(fmt.Sprintf("invalid slice length: length needs to be at least 32, got %v", len(bs)))
 	}
 
-	greater := int(C.secp256k1_fe_set_b32((*C.secp256k1_fe)(unsafe.Pointer(&x.inner[0])), (*C.uchar)(&bs[0]))) == 0
+	greater := int(C.secp256k1_fe_set_b32(&x.inner, (*C.uchar)(&bs[0]))) == 0
 	if greater {
 		x.normalize()
 	}
@@ -151,7 +150,7 @@ func (x Fp) PutB32(dst []byte) {
 	}
 
 	// NOTE: This function assumes that the representation is normalised.
-	C.secp256k1_fe_get_b32((*C.uchar)(&dst[0]), (*C.secp256k1_fe)(unsafe.Pointer(&x.inner[0])))
+	putB32From5x52(dst, &x.inner.n)
 }
 
 // SizeHint implements the surge.SizeHinter interface.
@@ -215,7 +214,7 @@ func (x *Fp) Add(a, b *Fp) {
 // same, then the function will panic.
 func (x *Fp) AddUnsafe(a, b *Fp) {
 	aCopy := *a
-	C.secp256k1_fe_add((*C.secp256k1_fe)(unsafe.Pointer(&aCopy.inner[0])), (*C.secp256k1_fe)(unsafe.Pointer(&b.inner[0])))
+	C.secp256k1_fe_add(&aCopy.inner, &b.inner)
 	*x = aCopy
 	x.normalize()
 }
@@ -238,7 +237,7 @@ func (x *Fp) AddAssign(a *Fp) {
 // implementation dependent. If the NULL pointer and the go nil pointer are the
 // same, then the function will panic.
 func (x *Fp) AddAssignUnsafe(a *Fp) {
-	C.secp256k1_fe_add((*C.secp256k1_fe)(unsafe.Pointer(&x.inner[0])), (*C.secp256k1_fe)(unsafe.Pointer(&a.inner[0])))
+	C.secp256k1_fe_add(&x.inner, &a.inner)
 	x.normalize()
 }
 
@@ -262,7 +261,7 @@ func (x *Fp) Negate(a *Fp) {
 func (x *Fp) NegateUnsafe(a *Fp) {
 	// NOTE: The final argument is set to 0 because it is assumed that the
 	// representation is normalized.
-	C.secp256k1_fe_negate((*C.secp256k1_fe)(unsafe.Pointer(&x.inner[0])), (*C.secp256k1_fe)(unsafe.Pointer(&a.inner[0])), 0)
+	C.secp256k1_fe_negate(&x.inner, &a.inner, 0)
 	x.normalize()
 }
 
@@ -295,11 +294,7 @@ func (x *Fp) MulNoAliase(a, b *Fp) {
 func (x *Fp) MulNoAliaseUnsafe(a, b *Fp) {
 	// NOTE: The c function defines the pointer to b as restrict, which means
 	// that it must not be aliased by x or a.
-	C.secp256k1_fe_mul(
-		(*C.secp256k1_fe)(unsafe.Pointer(&x.inner[0])),
-		(*C.secp256k1_fe)(unsafe.Pointer(&a.inner[0])),
-		(*C.secp256k1_fe)(unsafe.Pointer(&b.inner[0])),
-	)
+	C.secp256k1_fe_mul(&x.inner, &a.inner, &b.inner)
 	x.normalize()
 }
 
@@ -328,11 +323,7 @@ func (x *Fp) MulUnsafe(a, b *Fp) {
 	// that it must not be aliased by x or a. We therefore make a new copy of b
 	// to ensure that there is no aliasing.
 	bCopy := *b
-	C.secp256k1_fe_mul(
-		(*C.secp256k1_fe)(unsafe.Pointer(&x.inner[0])),
-		(*C.secp256k1_fe)(unsafe.Pointer(&a.inner[0])),
-		(*C.secp256k1_fe)(unsafe.Pointer(&bCopy.inner[0])),
-	)
+	C.secp256k1_fe_mul(&x.inner, &a.inner, &bCopy.inner)
 	x.normalize()
 }
 
@@ -354,7 +345,7 @@ func (x *Fp) Sqr(a *Fp) {
 // implementation dependent. If the NULL pointer and the go nil pointer are the
 // same, then the function will panic.
 func (x *Fp) SqrUnsafe(a *Fp) {
-	C.secp256k1_fe_sqr((*C.secp256k1_fe)(unsafe.Pointer(&x.inner[0])), (*C.secp256k1_fe)(unsafe.Pointer(&a.inner[0])))
+	C.secp256k1_fe_sqr(&x.inner, &a.inner)
 	x.normalize()
 }
 
@@ -378,34 +369,78 @@ func (x *Fp) Inv(a *Fp) {
 func (x *Fp) InvUnsafe(a *Fp) {
 	// We use the potentially faster but not constant time version of the
 	// inverse function.
-	C.secp256k1_fe_inv_var((*C.secp256k1_fe)(unsafe.Pointer(&x.inner[0])), (*C.secp256k1_fe)(unsafe.Pointer(&a.inner[0])))
+	C.secp256k1_fe_inv_var(&x.inner, &a.inner)
 	x.normalize()
 }
 
 // IsZero returns true if the field element is zero and false otherwise.
 func (x *Fp) IsZero() bool {
-	return (x.inner[0] | x.inner[1] | x.inner[2] | x.inner[3] | x.inner[4]) == 0
+	return (x.inner.n[0] | x.inner.n[1] | x.inner.n[2] | x.inner.n[3] | x.inner.n[4]) == 0
 }
 
 // IsOne returns true if the field element is zero and false otherwise.
 func (x *Fp) IsOne() bool {
-	return (x.inner[0] == 1) && ((x.inner[1] | x.inner[2] | x.inner[3] | x.inner[4]) == 0)
+	return (x.inner.n[0] == 1) && ((x.inner.n[1] | x.inner.n[2] | x.inner.n[3] | x.inner.n[4]) == 0)
 }
 
 // IsEven returns true if the field element is even and false otherwise.
 func (x *Fp) IsEven() bool {
-	return !((x.inner[0] & 1) == 1)
+	return !((x.inner.n[0] & 1) == 1)
 }
 
 // Eq returns true if the two field elements are equal, and false otherwise.
 func (x *Fp) Eq(other *Fp) bool {
-	return ((x.inner[0] ^ other.inner[0]) |
-		(x.inner[1] ^ other.inner[1]) |
-		(x.inner[2] ^ other.inner[2]) |
-		(x.inner[3] ^ other.inner[3]) |
-		(x.inner[4] ^ other.inner[4])) == 0
+	return ((x.inner.n[0] ^ other.inner.n[0]) |
+		(x.inner.n[1] ^ other.inner.n[1]) |
+		(x.inner.n[2] ^ other.inner.n[2]) |
+		(x.inner.n[3] ^ other.inner.n[3]) |
+		(x.inner.n[4] ^ other.inner.n[4])) == 0
 }
 
 func (x *Fp) normalize() {
-	C.secp256k1_fe_normalize_var((*C.secp256k1_fe)(unsafe.Pointer(&x.inner[0])))
+	C.secp256k1_fe_normalize_var(&x.inner)
+}
+
+// Writes into the destination byte slice the data from the array of 5 limbs in
+// base 52. When using this with the Fp type, it assumes that the data
+// representaiton is normalized.
+func putB32From5x52(dst []byte, arr *[5]C.uint64_t) {
+	dst[0] = byte((arr[4] >> 40) & 0xFF)
+	dst[1] = byte((arr[4] >> 32) & 0xFF)
+	dst[2] = byte((arr[4] >> 24) & 0xFF)
+	dst[3] = byte((arr[4] >> 16) & 0xFF)
+	dst[4] = byte((arr[4] >> 8) & 0xFF)
+	dst[5] = byte(arr[4] & 0xFF)
+
+	dst[6] = byte((arr[3] >> 44) & 0xFF)
+	dst[7] = byte((arr[3] >> 36) & 0xFF)
+	dst[8] = byte((arr[3] >> 28) & 0xFF)
+	dst[9] = byte((arr[3] >> 20) & 0xFF)
+	dst[10] = byte((arr[3] >> 12) & 0xFF)
+	dst[11] = byte((arr[3] >> 4) & 0xFF)
+
+	dst[12] = byte(((arr[2] >> 48) & 0xFF) | ((arr[3] & 0xF) << 4))
+
+	dst[13] = byte((arr[2] >> 40) & 0xFF)
+	dst[14] = byte((arr[2] >> 32) & 0xFF)
+	dst[15] = byte((arr[2] >> 24) & 0xFF)
+	dst[16] = byte((arr[2] >> 16) & 0xFF)
+	dst[17] = byte((arr[2] >> 8) & 0xFF)
+	dst[18] = byte(arr[2] & 0xFF)
+
+	dst[19] = byte((arr[1] >> 44) & 0xFF)
+	dst[20] = byte((arr[1] >> 36) & 0xFF)
+	dst[21] = byte((arr[1] >> 28) & 0xFF)
+	dst[22] = byte((arr[1] >> 20) & 0xFF)
+	dst[23] = byte((arr[1] >> 12) & 0xFF)
+	dst[24] = byte((arr[1] >> 4) & 0xFF)
+
+	dst[25] = byte(((arr[0] >> 48) & 0xFF) | ((arr[1] & 0xF) << 4))
+
+	dst[26] = byte((arr[0] >> 40) & 0xFF)
+	dst[27] = byte((arr[0] >> 32) & 0xFF)
+	dst[28] = byte((arr[0] >> 24) & 0xFF)
+	dst[29] = byte((arr[0] >> 16) & 0xFF)
+	dst[30] = byte((arr[0] >> 8) & 0xFF)
+	dst[31] = byte(arr[0] & 0xFF)
 }
