@@ -121,6 +121,63 @@ func (x *Fp) PutInt(dst *big.Int) {
 	dst.SetBytes(bs[:])
 }
 
+// PutB32 stores the bytes of the field element into destination in big endian
+// form.
+//
+// Panics: If the byte slice has length less than 32, this function will panic.
+func (x Fp) PutB32(dst []byte) {
+	if len(dst) < 32 {
+		panic(fmt.Sprintf("invalid slice length: length needs to be at least 32, got %v", len(dst)))
+	}
+
+	// NOTE: This function assumes that the representation is normalised.
+	putB32From5x52(dst, &x.inner)
+}
+
+// Writes into the destination byte slice the data from the array of 5 limbs in
+// base 52. When using this with the Fp type, it assumes that the data
+// representaiton is normalized.
+func putB32From5x52(dst []byte, x *C.secp256k1_fe) {
+	dst[0] = byte((x.n[4] >> 40) & 0xFF)
+	dst[1] = byte((x.n[4] >> 32) & 0xFF)
+	dst[2] = byte((x.n[4] >> 24) & 0xFF)
+	dst[3] = byte((x.n[4] >> 16) & 0xFF)
+	dst[4] = byte((x.n[4] >> 8) & 0xFF)
+	dst[5] = byte(x.n[4] & 0xFF)
+
+	dst[6] = byte((x.n[3] >> 44) & 0xFF)
+	dst[7] = byte((x.n[3] >> 36) & 0xFF)
+	dst[8] = byte((x.n[3] >> 28) & 0xFF)
+	dst[9] = byte((x.n[3] >> 20) & 0xFF)
+	dst[10] = byte((x.n[3] >> 12) & 0xFF)
+	dst[11] = byte((x.n[3] >> 4) & 0xFF)
+
+	dst[12] = byte(((x.n[2] >> 48) & 0xFF) | ((x.n[3] & 0xF) << 4))
+
+	dst[13] = byte((x.n[2] >> 40) & 0xFF)
+	dst[14] = byte((x.n[2] >> 32) & 0xFF)
+	dst[15] = byte((x.n[2] >> 24) & 0xFF)
+	dst[16] = byte((x.n[2] >> 16) & 0xFF)
+	dst[17] = byte((x.n[2] >> 8) & 0xFF)
+	dst[18] = byte(x.n[2] & 0xFF)
+
+	dst[19] = byte((x.n[1] >> 44) & 0xFF)
+	dst[20] = byte((x.n[1] >> 36) & 0xFF)
+	dst[21] = byte((x.n[1] >> 28) & 0xFF)
+	dst[22] = byte((x.n[1] >> 20) & 0xFF)
+	dst[23] = byte((x.n[1] >> 12) & 0xFF)
+	dst[24] = byte((x.n[1] >> 4) & 0xFF)
+
+	dst[25] = byte(((x.n[0] >> 48) & 0xFF) | ((x.n[1] & 0xF) << 4))
+
+	dst[26] = byte((x.n[0] >> 40) & 0xFF)
+	dst[27] = byte((x.n[0] >> 32) & 0xFF)
+	dst[28] = byte((x.n[0] >> 24) & 0xFF)
+	dst[29] = byte((x.n[0] >> 16) & 0xFF)
+	dst[30] = byte((x.n[0] >> 8) & 0xFF)
+	dst[31] = byte(x.n[0] & 0xFF)
+}
+
 // SetB32 sets the field element to be equal to the given byte slice,
 // interepreted as big endian. The field element will be reduced modulo P. This
 // function will return true if the bytes represented a number greater than or
@@ -132,7 +189,7 @@ func (x *Fp) SetB32(bs []byte) bool {
 		panic(fmt.Sprintf("invalid slice length: length needs to be at least 32, got %v", len(bs)))
 	}
 
-	greater := int(C.secp256k1_fe_set_b32(&x.inner, (*C.uchar)(&bs[0]))) == 0
+	greater := !set5x52FromB32(bs, &x.inner)
 	if greater {
 		x.normalize()
 	}
@@ -140,17 +197,52 @@ func (x *Fp) SetB32(bs []byte) bool {
 	return greater
 }
 
-// PutB32 stores the bytes of the field element into destination in big endian
-// form.
-//
-// Panics: If the byte slice has length less than 32, this function will panic.
-func (x Fp) PutB32(dst []byte) {
-	if len(dst) < 32 {
-		panic(fmt.Sprintf("invalid slice length: length needs to be at least 32, got %v", len(dst)))
-	}
+func set5x52FromB32(bs []byte, dst *C.secp256k1_fe) bool {
+	dst.n[0] = C.uint64_t(bs[31]) |
+		(C.uint64_t(bs[30]) << 8) |
+		(C.uint64_t(bs[29]) << 16) |
+		(C.uint64_t(bs[28]) << 24) |
+		(C.uint64_t(bs[27]) << 32) |
+		(C.uint64_t(bs[26]) << 40) |
+		(C.uint64_t(bs[25]&0xF) << 48)
 
-	// NOTE: This function assumes that the representation is normalised.
-	putB32From5x52(dst, &x.inner.n)
+	dst.n[1] = C.uint64_t((bs[25]>>4)&0xF) |
+		(C.uint64_t(bs[24]) << 4) |
+		(C.uint64_t(bs[23]) << 12) |
+		(C.uint64_t(bs[22]) << 20) |
+		(C.uint64_t(bs[21]) << 28) |
+		(C.uint64_t(bs[20]) << 36) |
+		(C.uint64_t(bs[19]) << 44)
+
+	dst.n[2] = C.uint64_t(bs[18]) |
+		(C.uint64_t(bs[17]) << 8) |
+		(C.uint64_t(bs[16]) << 16) |
+		(C.uint64_t(bs[15]) << 24) |
+		(C.uint64_t(bs[14]) << 32) |
+		(C.uint64_t(bs[13]) << 40) |
+		(C.uint64_t(bs[12]&0xF) << 48)
+
+	dst.n[3] = C.uint64_t((bs[12]>>4)&0xF) |
+		(C.uint64_t(bs[11]) << 4) |
+		(C.uint64_t(bs[10]) << 12) |
+		(C.uint64_t(bs[9]) << 20) |
+		(C.uint64_t(bs[8]) << 28) |
+		(C.uint64_t(bs[7]) << 36) |
+		(C.uint64_t(bs[6]) << 44)
+
+	dst.n[4] = C.uint64_t(bs[5]) |
+		(C.uint64_t(bs[4]) << 8) |
+		(C.uint64_t(bs[3]) << 16) |
+		(C.uint64_t(bs[2]) << 24) |
+		(C.uint64_t(bs[1]) << 32) |
+		(C.uint64_t(bs[0]) << 40)
+
+	// Check if the bytes represent a number greater than P.
+	greater := !((dst.n[4] == 0x0FFFFFFFFFFFF) &&
+		((dst.n[3] & dst.n[2] & dst.n[1]) == 0xFFFFFFFFFFFFF) &&
+		(dst.n[0] >= 0xFFFFEFFFFFC2F))
+
+	return greater
 }
 
 // SizeHint implements the surge.SizeHinter interface.
@@ -159,7 +251,7 @@ func (x Fp) SizeHint() int { return 32 }
 // Marshal implements the surge.Marshaler interface.
 func (x Fp) Marshal(w io.Writer, m int) (int, error) {
 	if m < 32 {
-		return m, surge.ErrMaxBytesExceeded
+		return m, surge.ErrUnexpectedEndOfBuffer
 	}
 
 	var bs [32]byte
@@ -172,7 +264,7 @@ func (x Fp) Marshal(w io.Writer, m int) (int, error) {
 // Unmarshal implements the surge.Unmarshaler interface.
 func (x *Fp) Unmarshal(r io.Reader, m int) (int, error) {
 	if m < 32 {
-		return m, surge.ErrMaxBytesExceeded
+		return m, surge.ErrUnexpectedEndOfBuffer
 	}
 
 	var bs [32]byte
@@ -390,57 +482,17 @@ func (x *Fp) IsEven() bool {
 
 // Eq returns true if the two field elements are equal, and false otherwise.
 func (x *Fp) Eq(other *Fp) bool {
-	return ((x.inner.n[0] ^ other.inner.n[0]) |
-		(x.inner.n[1] ^ other.inner.n[1]) |
-		(x.inner.n[2] ^ other.inner.n[2]) |
-		(x.inner.n[3] ^ other.inner.n[3]) |
-		(x.inner.n[4] ^ other.inner.n[4])) == 0
+	return fpEq(&x.inner, &other.inner)
+}
+
+func fpEq(lhs, rhs *C.secp256k1_fe) bool {
+	return ((lhs.n[0] ^ rhs.n[0]) |
+		(lhs.n[1] ^ rhs.n[1]) |
+		(lhs.n[2] ^ rhs.n[2]) |
+		(lhs.n[3] ^ rhs.n[3]) |
+		(lhs.n[4] ^ rhs.n[4])) == 0
 }
 
 func (x *Fp) normalize() {
 	C.secp256k1_fe_normalize_var(&x.inner)
-}
-
-// Writes into the destination byte slice the data from the array of 5 limbs in
-// base 52. When using this with the Fp type, it assumes that the data
-// representaiton is normalized.
-func putB32From5x52(dst []byte, arr *[5]C.uint64_t) {
-	dst[0] = byte((arr[4] >> 40) & 0xFF)
-	dst[1] = byte((arr[4] >> 32) & 0xFF)
-	dst[2] = byte((arr[4] >> 24) & 0xFF)
-	dst[3] = byte((arr[4] >> 16) & 0xFF)
-	dst[4] = byte((arr[4] >> 8) & 0xFF)
-	dst[5] = byte(arr[4] & 0xFF)
-
-	dst[6] = byte((arr[3] >> 44) & 0xFF)
-	dst[7] = byte((arr[3] >> 36) & 0xFF)
-	dst[8] = byte((arr[3] >> 28) & 0xFF)
-	dst[9] = byte((arr[3] >> 20) & 0xFF)
-	dst[10] = byte((arr[3] >> 12) & 0xFF)
-	dst[11] = byte((arr[3] >> 4) & 0xFF)
-
-	dst[12] = byte(((arr[2] >> 48) & 0xFF) | ((arr[3] & 0xF) << 4))
-
-	dst[13] = byte((arr[2] >> 40) & 0xFF)
-	dst[14] = byte((arr[2] >> 32) & 0xFF)
-	dst[15] = byte((arr[2] >> 24) & 0xFF)
-	dst[16] = byte((arr[2] >> 16) & 0xFF)
-	dst[17] = byte((arr[2] >> 8) & 0xFF)
-	dst[18] = byte(arr[2] & 0xFF)
-
-	dst[19] = byte((arr[1] >> 44) & 0xFF)
-	dst[20] = byte((arr[1] >> 36) & 0xFF)
-	dst[21] = byte((arr[1] >> 28) & 0xFF)
-	dst[22] = byte((arr[1] >> 20) & 0xFF)
-	dst[23] = byte((arr[1] >> 12) & 0xFF)
-	dst[24] = byte((arr[1] >> 4) & 0xFF)
-
-	dst[25] = byte(((arr[0] >> 48) & 0xFF) | ((arr[1] & 0xF) << 4))
-
-	dst[26] = byte((arr[0] >> 40) & 0xFF)
-	dst[27] = byte((arr[0] >> 32) & 0xFF)
-	dst[28] = byte((arr[0] >> 24) & 0xFF)
-	dst[29] = byte((arr[0] >> 16) & 0xFF)
-	dst[30] = byte((arr[0] >> 8) & 0xFF)
-	dst[31] = byte(arr[0] & 0xFF)
 }
