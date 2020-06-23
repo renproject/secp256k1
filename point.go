@@ -70,7 +70,7 @@ const PointSizeMarshalled int = 33
 
 // Point represents a point (group element) on the secp256k1 elliptic curve.
 type Point struct {
-	inner C.secp256k1_ge
+	inner C.secp256k1_gej
 }
 
 // NewPointFromXY constructs a new curve point from the given x and y
@@ -91,15 +91,18 @@ func NewPointInfinity() Point {
 
 // RandomPoint generates a random point on the elliptic curve.
 func RandomPoint() Point {
-	p := Point{}
+	var p Point
+	var tmp C.secp256k1_ge
 	var bs [1]byte
+
 	rand.Read(bs[:])
 	b := bs[0] & 1
 
 	for {
 		x := RandomFp()
-		if C.secp256k1_ge_set_xo_var(&p.inner, &x.inner, C.int(b)) != 0 {
-			C.secp256k1_fe_normalize_var(&p.inner.y)
+		if C.secp256k1_ge_set_xo_var(&tmp, &x.inner, C.int(b)) != 0 {
+			C.secp256k1_fe_normalize_var(&tmp.y)
+			C.secp256k1_gej_set_ge(&p.inner, &tmp)
 			return p
 		}
 	}
@@ -112,14 +115,23 @@ func (p *Point) SetXY(x, y *Fp) {
 	p.inner.x = x.inner
 	p.inner.y = y.inner
 
+	p.inner.z.n[0] = 1
+	p.inner.z.n[1] = 0
+	p.inner.z.n[2] = 0
+	p.inner.z.n[3] = 0
+	p.inner.z.n[4] = 0
+
 	// TODO: Should we check that the point is on the curve?
 }
 
 // XY returns the coordinates of the curve point.
 func (p *Point) XY() (Fp, Fp) {
 	var x, y Fp
-	x.inner = p.inner.x
-	y.inner = p.inner.y
+	var tmp C.secp256k1_ge
+
+	C.secp256k1_ge_set_gej(&tmp, &p.inner)
+	x.inner = tmp.x
+	y.inner = tmp.y
 	return x, y
 }
 
@@ -131,13 +143,16 @@ func (p *Point) PutBytes(dst []byte) {
 		panic(fmt.Sprintf("invalid slice length: length needs to be at least 33, got %v", len(dst)))
 	}
 
+	var tmp C.secp256k1_ge
+	C.secp256k1_ge_set_gej(&tmp, &p.inner)
+
 	if p.IsInfinity() {
 		dst[0] = 0xFF
 	} else {
-		dst[0] = byte(p.inner.y.n[0] & 1)
+		dst[0] = byte(tmp.y.n[0] & 1)
 	}
 
-	putB32From5x52(dst[1:PointSizeMarshalled], &p.inner.x)
+	putB32From5x52(dst[1:PointSizeMarshalled], &tmp.x)
 }
 
 // SetBytes sets the field element to be equal to the given byte slice. It will
@@ -154,17 +169,20 @@ func (p *Point) SetBytes(bs []byte) error {
 		return nil
 	}
 
-	set5x52FromB32(bs[1:PointSizeMarshalled], &p.inner.x)
-	if C.secp256k1_ge_set_xo_var(&p.inner, &p.inner.x, C.int(bs[0])&1) == 0 {
+	var tmp C.secp256k1_ge
+
+	set5x52FromB32(bs[1:PointSizeMarshalled], &tmp.x)
+	if C.secp256k1_ge_set_xo_var(&tmp, &tmp.x, C.int(bs[0])&1) == 0 {
 		// The x coordinate does not correspond to a valid curve point.
+		C.secp256k1_gej_clear(&p.inner)
 		return errors.New("invalid curve point data")
 	}
 
 	// After reconstructing the y coordinate, it is not guaranteed to be
 	// normalized, so we do that manually.
-	C.secp256k1_fe_normalize_var(&p.inner.y)
+	C.secp256k1_fe_normalize_var(&tmp.y)
 
-	p.inner.infinity = 0
+	C.secp256k1_gej_set_ge(&p.inner, &tmp)
 
 	return nil
 }
@@ -206,7 +224,9 @@ func (p *Point) IsInfinity() bool {
 // IsOnCurve returns true if the point is on the elliptic curve, and false
 // otherwise. The point at infinity will return false.
 func (p *Point) IsOnCurve() bool {
-	return C.secp256k1_ge_is_valid_var(&p.inner) != 0
+	var tmp C.secp256k1_ge
+	C.secp256k1_ge_set_gej(&tmp, &p.inner)
+	return C.secp256k1_ge_is_valid_var(&tmp) != 0
 }
 
 // Eq returns true if the two curve points are equal, and false otherwise.
@@ -219,7 +239,15 @@ func (p *Point) Eq(other *Point) bool {
 		return true
 	}
 
-	return fpEq(&p.inner.x, &other.inner.x) && fpEq(&p.inner.y, &other.inner.y)
+	var tmp1, tmp2 C.secp256k1_ge
+	C.secp256k1_ge_set_gej(&tmp1, &p.inner)
+	C.secp256k1_fe_normalize_var(&tmp1.x)
+	C.secp256k1_fe_normalize_var(&tmp1.y)
+	C.secp256k1_ge_set_gej(&tmp2, &other.inner)
+	C.secp256k1_fe_normalize_var(&tmp2.x)
+	C.secp256k1_fe_normalize_var(&tmp2.y)
+
+	return fpEq(&tmp1.x, &tmp2.x) && fpEq(&tmp1.y, &tmp2.y)
 }
 
 // BaseExp computes the scalar multiplication of the canonical generator of the
@@ -233,7 +261,9 @@ func (p *Point) BaseExp(scalar *Fn) {
 //
 //NOTE: It is assumed that the input point is not the point at infinity.
 func (p *Point) Scale(a *Point, scalar *Fn) {
-	scalarMul(&p.inner, &a.inner, &scalar.inner)
+	var tmp C.secp256k1_ge
+	C.secp256k1_ge_set_gej(&tmp, &a.inner)
+	scalarMul(&p.inner, &tmp, &scalar.inner)
 }
 
 // ScaleExt is the same as Scale but also works when the input point represents
@@ -248,33 +278,27 @@ func (p *Point) ScaleExt(a *Point, scalar *Fn) {
 	p.Scale(a, scalar)
 }
 
-func scalarMul(dst, a *C.secp256k1_ge, scalar *C.secp256k1_scalar) {
-	gej := C.secp256k1_gej{}
-
+func scalarMul(dst *C.secp256k1_gej, a *C.secp256k1_ge, scalar *C.secp256k1_scalar) {
 	// The final argument should be the maximum bit length of the absolute
 	// value of the scalar plus one, hence 256 + 1.
-	C.secp256k1_ecmult_const(&gej, a, scalar, 257)
-	C.secp256k1_ge_set_gej(dst, &gej)
+	C.secp256k1_ecmult_const(dst, a, scalar, 257)
 
 	// The curve scalar multiplication function doesn't make sure that the
 	// coordinates are normalized, so we need to do this manually.
-	normalizeXY(dst)
+	normalizeXYZ(dst)
 }
 
 // Add computes the curve addition of the two given curve points.
 func (p *Point) Add(a, b *Point) {
-	pGej, aGej := C.secp256k1_gej{}, C.secp256k1_gej{}
-	C.secp256k1_gej_set_ge(&pGej, &p.inner)
-	C.secp256k1_gej_set_ge(&aGej, &a.inner)
-	C.secp256k1_gej_add_ge_var(&pGej, &aGej, &b.inner, C.null_ptr)
-	C.secp256k1_ge_set_gej(&p.inner, &pGej)
+	C.secp256k1_gej_add_var(&p.inner, &a.inner, &b.inner, C.null_ptr)
 
 	// The curve addition function doesn't make sure that the coordinates are
 	// normalized, so we need to do this manually.
-	normalizeXY(&p.inner)
+	normalizeXYZ(&p.inner)
 }
 
-func normalizeXY(point *C.secp256k1_ge) {
+func normalizeXYZ(point *C.secp256k1_gej) {
 	C.secp256k1_fe_normalize_var(&point.x)
 	C.secp256k1_fe_normalize_var(&point.y)
+	C.secp256k1_fe_normalize_var(&point.z)
 }
