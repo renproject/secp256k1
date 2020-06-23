@@ -344,6 +344,16 @@ func BenchmarkAdd(b *testing.B) {
 	}
 }
 
+func BenchmarkBaseExp(b *testing.B) {
+	var x Point
+	var scalar Fn
+
+	scalar = RandomFn()
+
+	for i := 0; i < b.N; i++ {
+		x.BaseExp(&scalar)
+	}
+}
 func BenchmarkScale(b *testing.B) {
 	var x Point
 	var scalar Fn
