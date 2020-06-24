@@ -108,20 +108,19 @@ func RandomPoint() Point {
 	}
 }
 
-// SetXY sets the curve point to have the given coordinates.
-// TODO: Document based on the TODO below.
+// SetXY sets the curve point to have the given coordinates. Does not check if
+// the point is actaully on the curve.
 func (p *Point) SetXY(x, y *Fp) {
 	p.inner.infinity = 0
 	p.inner.x = x.inner
 	p.inner.y = y.inner
 
+	// Set z = 1.
 	p.inner.z.n[0] = 1
 	p.inner.z.n[1] = 0
 	p.inner.z.n[2] = 0
 	p.inner.z.n[3] = 0
 	p.inner.z.n[4] = 0
-
-	// TODO: Should we check that the point is on the curve?
 }
 
 // XY returns the coordinates of the curve point.
@@ -239,15 +238,18 @@ func (p *Point) Eq(other *Point) bool {
 		return true
 	}
 
-	var tmp1, tmp2 C.secp256k1_ge
-	C.secp256k1_ge_set_gej(&tmp1, &p.inner)
-	C.secp256k1_fe_normalize_var(&tmp1.x)
-	C.secp256k1_fe_normalize_var(&tmp1.y)
-	C.secp256k1_ge_set_gej(&tmp2, &other.inner)
-	C.secp256k1_fe_normalize_var(&tmp2.x)
-	C.secp256k1_fe_normalize_var(&tmp2.y)
+	// Scale p so that the z fields are equal. Once the z fields are equal, the
+	// points will be equal if and only if the x and y fields are equal.
+	//
+	// NOTE: This modifies the representation of p, but it will still represent
+	// the same point on the elliptic curve.
+	var s C.secp256k1_fe
+	C.secp256k1_fe_inv(&s, &p.inner.z)
+	C.secp256k1_fe_mul(&s, &s, &other.inner.z)
+	C.secp256k1_gej_rescale(&p.inner, &s)
+	normalizeXYZ(&p.inner)
 
-	return fpEq(&tmp1.x, &tmp2.x) && fpEq(&tmp1.y, &tmp2.y)
+	return fpEq(&p.inner.x, &other.inner.x) && fpEq(&p.inner.y, &other.inner.y)
 }
 
 // BaseExp computes the scalar multiplication of the canonical generator of the
