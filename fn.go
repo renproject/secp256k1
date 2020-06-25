@@ -21,11 +21,18 @@ import "C"
 import (
 	"crypto/rand"
 	"fmt"
-	"io"
 	"math/big"
+	"unsafe"
 
 	"github.com/renproject/surge"
 )
+
+// FnSize is the number of bytes needed to represent a curve point in memory.
+const FnSize int = int(unsafe.Sizeof(Fn{}))
+
+// FnSizeMarshalled is the number of bytes needed to represent a marshalled
+// curve point.
+const FnSizeMarshalled int = 32
 
 // Fn represents an element of the field defined by the prime N, where N is the
 // order of the elliptic curve group secp256k1.
@@ -137,33 +144,25 @@ func (x Fn) PutB32(dst []byte) {
 func (x Fn) SizeHint() int { return 32 }
 
 // Marshal implements the surge.Marshaler interface.
-func (x Fn) Marshal(w io.Writer, m int) (int, error) {
-	if m < 32 {
-		return m, surge.ErrUnexpectedEndOfBuffer
+func (x Fn) Marshal(buf []byte, rem int) ([]byte, int, error) {
+	if len(buf) < FnSizeMarshalled || rem < 32 {
+		return buf, rem, surge.ErrUnexpectedEndOfBuffer
 	}
 
-	var bs [32]byte
-	x.PutB32(bs[:])
-	n, err := w.Write(bs[:])
+	x.PutB32(buf[:FnSizeMarshalled])
 
-	return m - n, err
+	return buf[FnSizeMarshalled:], rem - FnSizeMarshalled, nil
 }
 
 // Unmarshal implements the surge.Unmarshaler interface.
-func (x *Fn) Unmarshal(r io.Reader, m int) (int, error) {
-	if m < 32 {
-		return m, surge.ErrUnexpectedEndOfBuffer
+func (x *Fn) Unmarshal(buf []byte, rem int) ([]byte, int, error) {
+	if len(buf) < FnSizeMarshalled || rem < FnSize {
+		return buf, rem, surge.ErrUnexpectedEndOfBuffer
 	}
 
-	var bs [32]byte
-	n, err := io.ReadFull(r, bs[:])
-	m -= n
-	if err != nil {
-		return m, err
-	}
-	x.SetB32(bs[:])
+	x.SetB32(buf[:FnSizeMarshalled])
 
-	return m, nil
+	return buf[FnSizeMarshalled:], rem - FnSize, nil
 }
 
 // SetU16 sets the field element to be equal to the given uint.
