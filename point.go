@@ -229,6 +229,9 @@ func (p *Point) IsOnCurve() bool {
 }
 
 // Eq returns true if the two curve points are equal, and false otherwise.
+//
+// NOTE: This modifies the representation of p, but it will still represent the
+// same point on the elliptic curve.
 func (p *Point) Eq(other *Point) bool {
 	if p.IsInfinity() != other.IsInfinity() {
 		return false
@@ -240,13 +243,10 @@ func (p *Point) Eq(other *Point) bool {
 
 	// Scale p so that the z fields are equal. Once the z fields are equal, the
 	// points will be equal if and only if the x and y fields are equal.
-	//
-	// NOTE: This modifies the representation of p, but it will still represent
-	// the same point on the elliptic curve.
 	var s C.secp256k1_fe
 	C.secp256k1_fe_inv(&s, &p.inner.z)
 	C.secp256k1_fe_mul(&s, &s, &other.inner.z)
-	C.secp256k1_gej_rescale(&p.inner, &s)
+	C.secp256k1_gej_rescale(&p.inner, &s) // Modifies representation of p.
 	normalizeXYZ(&p.inner)
 
 	return fpEq(&p.inner.x, &other.inner.x) && fpEq(&p.inner.y, &other.inner.y)
