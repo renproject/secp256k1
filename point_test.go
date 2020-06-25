@@ -357,6 +357,93 @@ var _ = Describe("Point", func() {
 	})
 
 	//
+	// Aliasing
+	//
+
+	It("should scale correctly when the first argument is an alias of the receiver", func() {
+		var a, aliased, expected Point
+		var scalar Fn
+		for i := 0; i < trials; i++ {
+			a = RandomPoint()
+			scalar = RandomFn()
+			aliased = a
+
+			aliased.ScaleUnsafe(&aliased, &scalar)
+			expected.ScaleUnsafe(&a, &scalar)
+
+			Expect(aliased.Eq(&expected)).To(BeTrue())
+		}
+	})
+
+	It("should do extended scaling correctly when the first argument is an alias of the receiver", func() {
+		var a, aliased, expected Point
+		var scalar Fn
+		for i := 0; i < trials; i++ {
+			a = RandomPoint()
+			scalar = RandomFn()
+			aliased = a
+
+			aliased.ScaleExtUnsafe(&aliased, &scalar)
+			expected.ScaleExtUnsafe(&a, &scalar)
+
+			Expect(aliased.Eq(&expected)).To(BeTrue())
+		}
+	})
+
+	It("should add correctly when the arguments are aliases of each other", func() {
+		var a, b, aliased, expected Point
+		for i := 0; i < trials; i++ {
+			a = RandomPoint()
+			b = a
+
+			aliased.AddUnsafe(&a, &a)
+			expected.AddUnsafe(&a, &b)
+
+			Expect(aliased.Eq(&expected)).To(BeTrue())
+		}
+	})
+
+	It("should add correctly when the first argument is an alias of the receiver", func() {
+		var a, b, aliased, expected Point
+		for i := 0; i < trials; i++ {
+			a, b = RandomPoint(), RandomPoint()
+			aliased = a
+
+			aliased.AddUnsafe(&aliased, &b)
+			expected.AddUnsafe(&a, &b)
+
+			Expect(aliased.Eq(&expected)).To(BeTrue())
+		}
+	})
+
+	It("should add correctly when the second argument is an alias of the receiver", func() {
+		var a, b, aliased, expected Point
+		for i := 0; i < trials; i++ {
+			a, b = RandomPoint(), RandomPoint()
+			aliased = b
+
+			aliased.AddUnsafe(&a, &aliased)
+			expected.AddUnsafe(&a, &b)
+
+			Expect(aliased.Eq(&expected)).To(BeTrue())
+		}
+	})
+
+	It("should add correctly when the receiver and the arguments are aliases of each other", func() {
+		var a, b, aliased, expected Point
+		for i := 0; i < trials; i++ {
+			a = RandomPoint()
+			b = a
+			aliased = a
+
+			aliased.AddUnsafe(&aliased, &aliased)
+			expected.AddUnsafe(&a, &b)
+
+			Expect(aliased.Eq(&expected)).To(BeTrue())
+		}
+	})
+
+	//
 	// Miscellaneous
 	//
 
