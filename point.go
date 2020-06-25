@@ -255,6 +255,20 @@ func (p *Point) Eq(other *Point) bool {
 // BaseExp computes the scalar multiplication of the canonical generator of the
 // curve by the given scalar.
 func (p *Point) BaseExp(scalar *Fn) {
+	if scalar == nil {
+		panic("expected first argument to not be nil")
+	}
+
+	p.BaseExpUnsafe(scalar)
+}
+
+// BaseExpUnsafe computes the scalar multiplication of the canonical generator
+// of the curve by the given scalar.
+//
+// Unsafe: If this function receives nil arguments, the behaviour is
+// implementation dependent, because the definition of the NULL pointer in c is
+// implementation dependent.
+func (p *Point) BaseExpUnsafe(scalar *Fn) {
 	scalarMul(&p.inner, &C.secp256k1_generator, &scalar.inner)
 }
 
@@ -263,6 +277,25 @@ func (p *Point) BaseExp(scalar *Fn) {
 //
 //NOTE: It is assumed that the input point is not the point at infinity.
 func (p *Point) Scale(a *Point, scalar *Fn) {
+	if a == nil {
+		panic("expected first argument to not be nil")
+	}
+	if scalar == nil {
+		panic("expected second argument to not be nil")
+	}
+
+	p.ScaleUnsafe(a, scalar)
+}
+
+// ScaleUnsafe computes the scalar multiplication of the given curve point by
+// the given scalar.
+//
+//NOTE: It is assumed that the input point is not the point at infinity.
+//
+// Unsafe: If this function receives nil arguments, the behaviour is
+// implementation dependent, because the definition of the NULL pointer in c is
+// implementation dependent.
+func (p *Point) ScaleUnsafe(a *Point, scalar *Fn) {
 	var tmp C.secp256k1_ge
 	C.secp256k1_ge_set_gej(&tmp, &a.inner)
 	scalarMul(&p.inner, &tmp, &scalar.inner)
@@ -272,12 +305,30 @@ func (p *Point) Scale(a *Point, scalar *Fn) {
 // the point at infinity; in this case the result of the scalar multiplication
 // will also be the point at infinity.
 func (p *Point) ScaleExt(a *Point, scalar *Fn) {
+	if a == nil {
+		panic("expected first argument to not be nil")
+	}
+	if scalar == nil {
+		panic("expected second argument to not be nil")
+	}
+
+	p.ScaleExtUnsafe(a, scalar)
+}
+
+// ScaleExtUnsafe is the same as Scale but also works when the input point
+// represents the point at infinity; in this case the result of the scalar
+// multiplication will also be the point at infinity.
+//
+// Unsafe: If this function receives nil arguments, the behaviour is
+// implementation dependent, because the definition of the NULL pointer in c is
+// implementation dependent.
+func (p *Point) ScaleExtUnsafe(a *Point, scalar *Fn) {
 	if a.IsInfinity() {
 		p.inner = a.inner
 		return
 	}
 
-	p.Scale(a, scalar)
+	p.ScaleUnsafe(a, scalar)
 }
 
 func scalarMul(dst *C.secp256k1_gej, a *C.secp256k1_ge, scalar *C.secp256k1_scalar) {
@@ -292,6 +343,22 @@ func scalarMul(dst *C.secp256k1_gej, a *C.secp256k1_ge, scalar *C.secp256k1_scal
 
 // Add computes the curve addition of the two given curve points.
 func (p *Point) Add(a, b *Point) {
+	if a == nil {
+		panic("expected first argument to be not be nil")
+	}
+	if b == nil {
+		panic("expected second argument to be not be nil")
+	}
+
+	p.AddUnsafe(a, b)
+}
+
+// AddUnsafe computes the curve addition of the two given curve points.
+//
+// Unsafe: If this function receives nil arguments, the behaviour is
+// implementation dependent, because the definition of the NULL pointer in c is
+// implementation dependent.
+func (p *Point) AddUnsafe(a, b *Point) {
 	C.secp256k1_gej_add_var(&p.inner, &a.inner, &b.inner, C.null_ptr)
 
 	// The curve addition function doesn't make sure that the coordinates are

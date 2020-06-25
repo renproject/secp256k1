@@ -79,7 +79,7 @@ var _ = Describe("Point", func() {
 			scalar = RandomFn()
 			scalar.PutB32(bs[:])
 
-			actual.BaseExp(&scalar)
+			actual.BaseExpUnsafe(&scalar)
 
 			x, y = ec.S256().ScalarBaseMult(bs[:])
 			copyLeftPadZero(bs[:], x.Bytes())
@@ -111,7 +111,7 @@ var _ = Describe("Point", func() {
 			scalar = RandomFn()
 			scalar.PutB32(bs[:])
 
-			actual.Scale(&a, &scalar)
+			actual.ScaleUnsafe(&a, &scalar)
 
 			x, y = ec.S256().ScalarMult(ax, ay, bs[:])
 			copyLeftPadZero(bs[:], x.Bytes())
@@ -134,14 +134,14 @@ var _ = Describe("Point", func() {
 
 			// When the point is not the point at infinity, it should be the
 			// same as the unextended function.
-			actual.ScaleExt(&a, &scalar)
-			expected.Scale(&a, &scalar)
+			actual.ScaleExtUnsafe(&a, &scalar)
+			expected.ScaleUnsafe(&a, &scalar)
 
 			Expect(actual.Eq(&expected)).To(BeTrue())
 
 			// When the point is the point at infinity, the result should also
 			// be the point at infinity.
-			actual.ScaleExt(&inf, &scalar)
+			actual.ScaleExtUnsafe(&inf, &scalar)
 			expected = inf
 
 			Expect(actual.Eq(&expected)).To(BeTrue())
@@ -166,7 +166,7 @@ var _ = Describe("Point", func() {
 			bxf.PutInt(bx)
 			byf.PutInt(by)
 
-			actual.Add(&a, &b)
+			actual.AddUnsafe(&a, &b)
 
 			x, y = ec.S256().Add(ax, ay, bx, by)
 			copyLeftPadZero(bs[:], x.Bytes())
@@ -180,16 +180,16 @@ var _ = Describe("Point", func() {
 			// Adding the point at infinity should be the identity operation.
 			expected = a
 
-			actual.Add(&a, &inf)
+			actual.AddUnsafe(&a, &inf)
 			Expect(actual.Eq(&expected)).To(BeTrue())
 
-			actual.Add(&inf, &a)
+			actual.AddUnsafe(&inf, &a)
 			Expect(actual.Eq(&expected)).To(BeTrue())
 
 			// Adding two points at infinity should give the point at infinity.
 			a = inf
 			b = inf
-			actual.Add(&a, &b)
+			actual.AddUnsafe(&a, &b)
 			expected = inf
 
 			Expect(actual.Eq(&expected)).To(BeTrue())
@@ -332,6 +332,86 @@ var _ = Describe("Point", func() {
 			Expect(func() { p.PutBytes(bs[:i]) }).To(Panic())
 		}
 	})
+
+	It("should panic when base exponentiating when the argument is nil", func() {
+		var p Point
+		Expect(func() { p.BaseExp(nil) }).To(Panic())
+	})
+
+	It("should panic when scaling when either argument is nil", func() {
+		var p Point
+		Expect(func() { p.Scale(nil, &Fn{}) }).To(Panic())
+		Expect(func() { p.Scale(&Point{}, nil) }).To(Panic())
+	})
+
+	It("should panic when doing extended scaling when either argument is nil", func() {
+		var p Point
+		Expect(func() { p.ScaleExt(nil, &Fn{}) }).To(Panic())
+		Expect(func() { p.ScaleExt(&Point{}, nil) }).To(Panic())
+	})
+
+	It("should panic when adding when either argument is nil", func() {
+		var p Point
+		Expect(func() { p.Add(nil, &Point{}) }).To(Panic())
+		Expect(func() { p.Add(&Point{}, nil) }).To(Panic())
+	})
+
+	//
+	// Miscellaneous
+	//
+
+	Specify("base exponentiating should be the same as the unsafe variant", func() {
+		var safe, unsafe Point
+		var scalar Fn
+		for i := 0; i < trials; i++ {
+			scalar = RandomFn()
+
+			safe.BaseExp(&scalar)
+			unsafe.BaseExpUnsafe(&scalar)
+
+			Expect(safe.Eq(&unsafe)).To(BeTrue())
+		}
+	})
+
+	Specify("scaling should be the same as the unsafe variant", func() {
+		var a, safe, unsafe Point
+		var scalar Fn
+		for i := 0; i < trials; i++ {
+			a = RandomPoint()
+			scalar = RandomFn()
+
+			safe.Scale(&a, &scalar)
+			unsafe.ScaleUnsafe(&a, &scalar)
+
+			Expect(safe.Eq(&unsafe)).To(BeTrue())
+		}
+	})
+
+	Specify("extended scaling should be the same as the unsafe variant", func() {
+		var a, safe, unsafe Point
+		var scalar Fn
+		for i := 0; i < trials; i++ {
+			a = RandomPoint()
+			scalar = RandomFn()
+
+			safe.ScaleExt(&a, &scalar)
+			unsafe.ScaleExtUnsafe(&a, &scalar)
+
+			Expect(safe.Eq(&unsafe)).To(BeTrue())
+		}
+	})
+
+	Specify("addition should be the same as the unsafe variant", func() {
+		var a, b, safe, unsafe Point
+		for i := 0; i < trials; i++ {
+			a, b = RandomPoint(), RandomPoint()
+
+			safe.Add(&a, &b)
+			unsafe.AddUnsafe(&a, &b)
+
+			Expect(safe.Eq(&unsafe)).To(BeTrue())
+		}
+	})
 })
 
 func BenchmarkAdd(b *testing.B) {
@@ -340,7 +420,7 @@ func BenchmarkAdd(b *testing.B) {
 	x, y = RandomPoint(), RandomPoint()
 
 	for i := 0; i < b.N; i++ {
-		x.Add(&x, &y)
+		x.AddUnsafe(&x, &y)
 	}
 }
 
@@ -351,7 +431,7 @@ func BenchmarkBaseExp(b *testing.B) {
 	scalar = RandomFn()
 
 	for i := 0; i < b.N; i++ {
-		x.BaseExp(&scalar)
+		x.BaseExpUnsafe(&scalar)
 	}
 }
 func BenchmarkScale(b *testing.B) {
@@ -362,6 +442,6 @@ func BenchmarkScale(b *testing.B) {
 	scalar = RandomFn()
 
 	for i := 0; i < b.N; i++ {
-		x.Scale(&x, &scalar)
+		x.ScaleUnsafe(&x, &scalar)
 	}
 }
