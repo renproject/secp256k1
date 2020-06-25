@@ -90,20 +90,35 @@ func NewPointInfinity() Point {
 }
 
 // RandomPoint generates a random point on the elliptic curve.
+//
+// Panics: This function will panic if there was an error reading bytes from
+// the random source.
 func RandomPoint() Point {
+	p, err := RandomPointNoPanic()
+	if err != nil {
+		panic(fmt.Sprintf("could not generate random bytes: %v", err))
+	}
+	return p
+}
+
+// RandomPointNoPanic generates a random point on the elliptic curve.
+func RandomPointNoPanic() (Point, error) {
 	var p Point
 	var tmp C.secp256k1_ge
 	var bs [1]byte
 
-	rand.Read(bs[:])
-	b := bs[0] & 1
+	_, err := rand.Read(bs[:])
+	if err != nil {
+		return Point{}, err
+	}
 
+	b := bs[0] & 1
 	for {
 		x := RandomFp()
 		if C.secp256k1_ge_set_xo_var(&tmp, &x.inner, C.int(b)) != 0 {
 			C.secp256k1_fe_normalize_var(&tmp.y)
 			C.secp256k1_gej_set_ge(&p.inner, &tmp)
-			return p
+			return p, nil
 		}
 	}
 }

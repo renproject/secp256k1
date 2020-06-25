@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	. "github.com/renproject/secp256k1"
+	"github.com/renproject/secp256k1/secp256k1tutil"
 )
 
 var _ = Describe("Point", func() {
@@ -498,6 +499,19 @@ var _ = Describe("Point", func() {
 
 			Expect(safe.Eq(&unsafe)).To(BeTrue())
 		}
+	})
+
+	It("should return an error when there is a read error when safely generating a random curve point", func() {
+		secp256k1tutil.UseErrReader(func() {
+			_, err := RandomPointNoPanic()
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	It("should panic when there is a read error when generating a random curve point", func() {
+		secp256k1tutil.UseErrReader(func() {
+			Expect(func() { RandomPoint() }).To(Panic())
+		})
 	})
 })
 
