@@ -1,10 +1,8 @@
 package secp256k1_test
 
 import (
-	"bytes"
 	"crypto/rand"
 	"math/big"
-	mrand "math/rand"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -561,68 +559,71 @@ var _ = Describe("Fp", func() {
 	})
 
 	It("should be equal after marshaling and unmarshaling with surge", func() {
-		var bs [32]byte
-		var x, y Fp
-
-		buf := bytes.NewBuffer(bs[:])
-		max := x.SizeHint()
+		var bs [FpSizeMarshalled]byte
+		var before, after Fp
 
 		for i := 0; i < trials; i++ {
-			x = RandomFp()
+			before = RandomFp()
 
-			buf.Reset()
-			m, err := x.Marshal(buf, max)
+			tail, rem, err := before.Marshal(bs[:], before.SizeHint())
 			Expect(err).ToNot(HaveOccurred())
-			Expect(m).To(Equal(0))
+			Expect(rem).To(Equal(0))
+			Expect(len(tail)).To(Equal(0))
 
-			m, err = y.Unmarshal(buf, max)
+			tail, rem, err = after.Unmarshal(bs[:], FpSize)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(m).To(Equal(0))
+			Expect(rem).To(Equal(0))
+			Expect(len(tail)).To(Equal(0))
 
-			Expect(y.Eq(&x)).To(BeTrue())
+			Expect(after.Eq(&before)).To(BeTrue())
 		}
 	})
 
-	It("should return an error when marshaling with not enough remaining bytes", func() {
-		var x Fp
+	It("should return an error when marshalling with a buffer that is too small", func() {
+		var bs [FpSizeMarshalled - 1]byte
+		var p Fp
 
-		for i := 0; i < trials; i++ {
-			x = RandomFp()
-			max := mrand.Intn(x.SizeHint())
-
-			m, err := x.Marshal(nil, max)
+		for i := 0; i < FpSizeMarshalled-1; i++ {
+			tail, rem, err := p.Marshal(bs[:i], FpSizeMarshalled)
 			Expect(err).To(HaveOccurred())
-			Expect(m).To(Equal(max))
+			Expect(rem).To(Equal(FpSizeMarshalled))
+			Expect(len(tail)).To(Equal(i))
 		}
 	})
 
-	It("should return an error when unmarshaling with not enough remaining bytes", func() {
-		var x Fp
+	It("should return an error when marshalling with not enough remaining bytes", func() {
+		var bs [FpSizeMarshalled]byte
+		var p Fp
 
-		for i := 0; i < trials; i++ {
-			x = RandomFp()
-
-			max := mrand.Intn(x.SizeHint())
-			m, err := x.Unmarshal(nil, max)
+		for i := 0; i < FpSizeMarshalled-1; i++ {
+			tail, rem, err := p.Marshal(bs[:], i)
 			Expect(err).To(HaveOccurred())
-			Expect(m).To(Equal(max))
+			Expect(rem).To(Equal(i))
+			Expect(len(tail)).To(Equal(FpSizeMarshalled))
 		}
 	})
 
-	It("should return an error when unmarshaling and the reader returns an error", func() {
-		var bs [1]byte
-		var x Fp
+	It("should return an error when unmarshalling with a buffer that is too small", func() {
+		var bs [FpSizeMarshalled - 1]byte
+		var p Fp
 
-		buf := bytes.NewBuffer(bs[:0])
-		max := x.SizeHint()
-
-		for i := 0; i < trials; i++ {
-			x = RandomFp()
-			buf.Reset()
-
-			m, err := x.Unmarshal(buf, max)
+		for i := 0; i < FpSizeMarshalled-1; i++ {
+			tail, rem, err := p.Unmarshal(bs[:i], FpSizeMarshalled)
 			Expect(err).To(HaveOccurred())
-			Expect(m).To(Equal(max))
+			Expect(rem).To(Equal(FpSizeMarshalled))
+			Expect(len(tail)).To(Equal(i))
+		}
+	})
+
+	It("should return an error when unmarshalling with not enough remaining bytes", func() {
+		var bs [FpSizeMarshalled]byte
+		var p Fp
+
+		for i := 0; i < FpSizeMarshalled-1; i++ {
+			tail, rem, err := p.Unmarshal(bs[:], i)
+			Expect(err).To(HaveOccurred())
+			Expect(rem).To(Equal(i))
+			Expect(len(tail)).To(Equal(FpSizeMarshalled))
 		}
 	})
 

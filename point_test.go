@@ -202,7 +202,7 @@ var _ = Describe("Point", func() {
 	//
 
 	It("should be equal after converting to and from bytes", func() {
-		var bs [33]byte
+		var bs [PointSizeMarshalled]byte
 		var before, after Point
 
 		// Point at infinity.
@@ -227,7 +227,7 @@ var _ = Describe("Point", func() {
 	})
 
 	It("should be equal after marshaling and unmarshaling with surge", func() {
-		var bs [33]byte
+		var bs [PointSizeMarshalled]byte
 		var before, after Point
 
 		for i := 0; i < trials; i++ {

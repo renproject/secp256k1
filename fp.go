@@ -31,11 +31,18 @@ import "C"
 import (
 	"crypto/rand"
 	"fmt"
-	"io"
 	"math/big"
+	"unsafe"
 
 	"github.com/renproject/surge"
 )
+
+// FpSize is the number of bytes needed to represent a curve point in memory.
+const FpSize int = int(unsafe.Sizeof(Fp{}))
+
+// FpSizeMarshalled is the number of bytes needed to represent a marshalled
+// curve point.
+const FpSizeMarshalled int = 32
 
 // Fp represents an element of the field corresponding to the coordinates of
 // the points that lie on the secp256k1 elliptic curve.
@@ -246,36 +253,28 @@ func set5x52FromB32(bs []byte, dst *C.secp256k1_fe) bool {
 }
 
 // SizeHint implements the surge.SizeHinter interface.
-func (x Fp) SizeHint() int { return 32 }
+func (x Fp) SizeHint() int { return FpSizeMarshalled }
 
 // Marshal implements the surge.Marshaler interface.
-func (x Fp) Marshal(w io.Writer, m int) (int, error) {
-	if m < 32 {
-		return m, surge.ErrUnexpectedEndOfBuffer
+func (x Fp) Marshal(buf []byte, rem int) ([]byte, int, error) {
+	if len(buf) < FpSizeMarshalled || rem < 32 {
+		return buf, rem, surge.ErrUnexpectedEndOfBuffer
 	}
 
-	var bs [32]byte
-	x.PutB32(bs[:])
-	n, err := w.Write(bs[:])
+	x.PutB32(buf[:FpSizeMarshalled])
 
-	return m - n, err
+	return buf[FpSizeMarshalled:], rem - FpSizeMarshalled, nil
 }
 
 // Unmarshal implements the surge.Unmarshaler interface.
-func (x *Fp) Unmarshal(r io.Reader, m int) (int, error) {
-	if m < 32 {
-		return m, surge.ErrUnexpectedEndOfBuffer
+func (x *Fp) Unmarshal(buf []byte, rem int) ([]byte, int, error) {
+	if len(buf) < FpSizeMarshalled || rem < FpSize {
+		return buf, rem, surge.ErrUnexpectedEndOfBuffer
 	}
 
-	var bs [32]byte
-	n, err := io.ReadFull(r, bs[:])
-	m -= n
-	if err != nil {
-		return m, err
-	}
-	x.SetB32(bs[:])
+	x.SetB32(buf[:FpSizeMarshalled])
 
-	return m, nil
+	return buf[FpSizeMarshalled:], rem - FpSize, nil
 }
 
 // Add computes the addition of the two field elements and stores the result in
