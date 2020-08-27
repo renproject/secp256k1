@@ -3,6 +3,7 @@ package secp256k1_test
 import (
 	"crypto/rand"
 	"math/big"
+	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -746,3 +747,33 @@ var _ = Describe("Fn", func() {
 		})
 	})
 })
+
+func BenchmarkFnAdd(b *testing.B) {
+	var x, y, z Fn
+
+	x, y = RandomFn(), RandomFn()
+
+	for i := 0; i < b.N; i++ {
+		z.AddUnsafe(&x, &y)
+	}
+}
+
+func BenchmarkFnMul(b *testing.B) {
+	var x, y, z Fn
+
+	x, y = RandomFn(), RandomFn()
+
+	for i := 0; i < b.N; i++ {
+		z.MulUnsafe(&x, &y)
+	}
+}
+
+func BenchmarkFnInverse(b *testing.B) {
+	var x, z Fn
+
+	x = RandomFn()
+
+	for i := 0; i < b.N; i++ {
+		z.InverseUnsafe(&x)
+	}
+}
