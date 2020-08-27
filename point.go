@@ -141,15 +141,19 @@ func (p *Point) SetXY(x, y *Fp) {
 	p.inner.z.n[4] = 0
 }
 
-// XY returns the coordinates of the curve point.
-func (p *Point) XY() (Fp, Fp) {
+// XY returns the coordinates of the curve point, or an error if it is the
+// point at infinity (which does not have valid x and y coordinates).
+func (p *Point) XY() (Fp, Fp, error) {
+	if p.IsInfinity() {
+		return Fp{}, Fp{}, errors.New("point at infinity does not have valid cartesian coordinates")
+	}
 	var x, y Fp
 	var tmp C.secp256k1_ge
 
 	C.secp256k1_ge_set_gej(&tmp, &p.inner)
 	x.inner = tmp.x
 	y.inner = tmp.y
-	return x, y
+	return x, y, nil
 }
 
 // PutBytes stores the bytes of the field element into destination slice.

@@ -37,14 +37,20 @@ var _ = Describe("Point", func() {
 			Expect(err).To(HaveOccurred())
 
 			a = RandomPoint()
-			ax, ay = a.XY()
+			ax, ay, _ = a.XY()
 			b, err = NewPointFromXY(&ax, &ay)
 			Expect(err).ToNot(HaveOccurred())
 
-			x, y = b.XY()
+			x, y, _ = b.XY()
 			Expect(ax.Eq(&x)).To(BeTrue())
 			Expect(ay.Eq(&y)).To(BeTrue())
 		}
+	})
+
+	It("should return an error when getting the coordinates of the point at infinity", func() {
+		a := NewPointInfinity()
+		_, _, err := a.XY()
+		Expect(err).To(HaveOccurred())
 	})
 
 	It("should compare points correctly", func() {
@@ -111,7 +117,7 @@ var _ = Describe("Point", func() {
 
 		for i := 0; i < trials; i++ {
 			a = RandomPoint()
-			axf, ayf = a.XY()
+			axf, ayf, _ = a.XY()
 			axf.PutInt(ax)
 			ayf.PutInt(ay)
 
@@ -166,8 +172,8 @@ var _ = Describe("Point", func() {
 
 		for i := 0; i < trials; i++ {
 			a, b = RandomPoint(), RandomPoint()
-			axf, ayf = a.XY()
-			bxf, byf = b.XY()
+			axf, ayf, _ = a.XY()
+			bxf, byf, _ = b.XY()
 			axf.PutInt(ax)
 			ayf.PutInt(ay)
 			bxf.PutInt(bx)
