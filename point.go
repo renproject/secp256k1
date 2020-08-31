@@ -75,10 +75,13 @@ type Point struct {
 
 // NewPointFromXY constructs a new curve point from the given x and y
 // coordinates.
-func NewPointFromXY(x, y *Fp) Point {
+func NewPointFromXY(x, y *Fp) (Point, error) {
 	p := Point{}
 	p.SetXY(x, y)
-	return p
+	if !p.IsOnCurve() {
+		return Point{}, errors.New("given coordinates do not correspond to a valid curve point")
+	}
+	return p, nil
 }
 
 // NewPointInfinity returns a new curve point that represents the point at

@@ -26,16 +26,22 @@ var _ = Describe("Point", func() {
 	}
 
 	It("should correctly construct points from coordinates", func() {
-		var a Point
+		var a, b Point
 		var x, y Fp
 		var ax, ay Fp
+		var err error
 
 		for i := 0; i < trials; i++ {
 			x, y = RandomFp(), RandomFp()
-			a = NewPointFromXY(&x, &y)
+			a, err = NewPointFromXY(&x, &y)
+			Expect(err).To(HaveOccurred())
 
+			a = RandomPoint()
 			ax, ay = a.XY()
+			b, err = NewPointFromXY(&ax, &ay)
+			Expect(err).ToNot(HaveOccurred())
 
+			x, y = b.XY()
 			Expect(ax.Eq(&x)).To(BeTrue())
 			Expect(ay.Eq(&y)).To(BeTrue())
 		}
