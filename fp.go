@@ -350,8 +350,9 @@ func (x *Fp) Negate(a *Fp) {
 // implementation dependent. If the NULL pointer and the go nil pointer are the
 // same, then the function will panic.
 func (x *Fp) NegateUnsafe(a *Fp) {
-	// NOTE: The final argument is set to 0 because it is assumed that the
-	// representation is normalized.
+	x.normalize()
+	// NOTE: The final argument is set to 0 because the representation is
+	// normalized.
 	C.secp256k1_fe_negate(&x.inner, &a.inner, 0)
 	x.normalize()
 }
