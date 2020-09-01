@@ -114,10 +114,12 @@ var _ = Describe("Point", func() {
 
 		x, y := new(big.Int), new(big.Int)
 		ax, ay := new(big.Int), new(big.Int)
+		var err error
 
 		for i := 0; i < trials; i++ {
 			a = RandomPoint()
-			axf, ayf, _ = a.XY()
+			axf, ayf, err = a.XY()
+			Expect(err).ToNot(HaveOccurred())
 			axf.PutInt(ax)
 			ayf.PutInt(ay)
 
@@ -169,11 +171,14 @@ var _ = Describe("Point", func() {
 
 		x, y := new(big.Int), new(big.Int)
 		ax, ay, bx, by := new(big.Int), new(big.Int), new(big.Int), new(big.Int)
+		var err error
 
 		for i := 0; i < trials; i++ {
 			a, b = RandomPoint(), RandomPoint()
-			axf, ayf, _ = a.XY()
-			bxf, byf, _ = b.XY()
+			axf, ayf, err = a.XY()
+			Expect(err).ToNot(HaveOccurred())
+			bxf, byf, err = b.XY()
+			Expect(err).ToNot(HaveOccurred())
 			axf.PutInt(ax)
 			ayf.PutInt(ay)
 			bxf.PutInt(bx)
