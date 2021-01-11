@@ -531,8 +531,8 @@ var _ = Describe("Point", func() {
 		})
 	})
 
-	Context("regression tests", func() {
-		It("should handle point equality correctly", func() {
+	FContext("regression tests", func() {
+		unnormalisedPoint := func() Point {
 			// Previously determined value that leads to the bad curve point.
 			scalarInt, _ := big.NewInt(0).SetString("104594261325654521456437189213270314662855164308234370710339505268369968110053", 10)
 			buf := [32]byte{}
@@ -542,21 +542,50 @@ var _ = Describe("Point", func() {
 
 			// Base exponentiation causes the `z` value in the gej representation to
 			// not be 1.
-			badPoint := Point{}
-			badPoint.BaseExp(&scalar)
+			unnormalised := Point{}
+			unnormalised.BaseExp(&scalar)
 			tmp := Point{}
 
 			// Scaling causes the base to be rescaled, which for our specifically
 			// chosen base will cause the `x` and/or `y` values in the gej
 			// representation to be not normalised.
-			tmp.Scale(&badPoint, &scalar)
+			tmp.Scale(&unnormalised, &scalar)
+			return unnormalised
+		}
+
+		willBecomeUnnormalisedPoint := func() Point {
+			scalarInt, _ := big.NewInt(0).SetString("104594261325654521456437189213270314662855164308234370710339505268369968110053", 10)
+			buf := [32]byte{}
+			scalarInt.FillBytes(buf[:])
+			scalar := Fn{}
+			scalar.SetB32(buf[:])
+
+			primed := Point{}
+			primed.BaseExp(&scalar)
+
+			return primed
+		}
+
+		It("should handle point equality correctly", func() {
 
 			// At this stage we have a bad point that is in a non-normalised
 			// representation. We can get a normalised representation by
 			// calling a method that normalises the caller, for example `Eq`.
-			normalised := badPoint
+			unnormalised := unnormalisedPoint()
+			normalised := unnormalised
 			normalised.Eq(&normalised)
-			Expect(normalised.Eq(&badPoint)).To(BeTrue())
+			Expect(normalised.Eq(&unnormalised)).To(BeTrue())
+		})
+
+		It("should marshal correctly", func() {
+			unnormalised := willBecomeUnnormalisedPoint()
+			buf := [33]byte{}
+			unnormalised.PutBytes(buf[:])
+
+			after := Point{}
+			after.SetBytes(buf[:])
+
+			Expect(after.Eq(&unnormalised)).To(BeTrue())
 		})
 	})
 })
