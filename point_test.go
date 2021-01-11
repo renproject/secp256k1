@@ -531,7 +531,7 @@ var _ = Describe("Point", func() {
 		})
 	})
 
-	FContext("regression tests", func() {
+	Context("regression tests", func() {
 		unnormalisedPoint := func() Point {
 			// Previously determined value that leads to the bad curve point.
 			scalarInt, _ := big.NewInt(0).SetString("104594261325654521456437189213270314662855164308234370710339505268369968110053", 10)
