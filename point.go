@@ -168,6 +168,7 @@ func (p *Point) PutBytes(dst []byte) {
 	pCopy := *p
 	C.secp256k1_ge_set_gej(&tmp, &pCopy.inner)
 	C.secp256k1_fe_normalize_var(&tmp.x)
+	C.secp256k1_fe_normalize_var(&tmp.y)
 
 	if pCopy.IsInfinity() {
 		dst[0] = 0xFF
