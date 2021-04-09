@@ -24,6 +24,7 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE
           export PATH=$PATH:$(go env GOPATH)/bin
+          go get github.com/onsi/gomega/matchers@v1.10.1
           go get -u golang.org/x/lint/golint
           go vet ./...
           golint ./...
