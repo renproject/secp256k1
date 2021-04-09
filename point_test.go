@@ -532,9 +532,11 @@ var _ = Describe("Point", func() {
 	})
 
 	Context("regression tests", func() {
-		It("should handle point equality correctly", func() {
+		bad := "104594261325654521456437189213270314662855164308234370710339505268369968110053"
+		bady := "63841638568451640125764236139710619670518082485545205673739600116664829291880"
+		unnormalisedPoint := func(str string) (Point, Point) {
 			// Previously determined value that leads to the bad curve point.
-			scalarInt, _ := big.NewInt(0).SetString("104594261325654521456437189213270314662855164308234370710339505268369968110053", 10)
+			scalarInt, _ := big.NewInt(0).SetString(str, 10)
 			buf := [32]byte{}
 			scalarInt.FillBytes(buf[:])
 			scalar := Fn{}
@@ -542,21 +544,47 @@ var _ = Describe("Point", func() {
 
 			// Base exponentiation causes the `z` value in the gej representation to
 			// not be 1.
-			badPoint := Point{}
-			badPoint.BaseExp(&scalar)
+			normalised := Point{}
+			normalised.BaseExp(&scalar)
+			unnormalised := normalised
 			tmp := Point{}
 
 			// Scaling causes the base to be rescaled, which for our specifically
 			// chosen base will cause the `x` and/or `y` values in the gej
 			// representation to be not normalised.
-			tmp.Scale(&badPoint, &scalar)
+			tmp.Scale(&unnormalised, &scalar)
+			return normalised, unnormalised
+		}
+
+		It("should handle point equality correctly", func() {
 
 			// At this stage we have a bad point that is in a non-normalised
 			// representation. We can get a normalised representation by
 			// calling a method that normalises the caller, for example `Eq`.
-			normalised := badPoint
-			normalised.Eq(&normalised)
-			Expect(normalised.Eq(&badPoint)).To(BeTrue())
+			normalised, unnormalised := unnormalisedPoint(bad)
+			Expect(normalised.Eq(&unnormalised)).To(BeTrue())
+		})
+
+		It("should marshal correctly", func() {
+			point, _ := unnormalisedPoint(bad)
+			buf := [33]byte{}
+			point.PutBytes(buf[:])
+
+			after := Point{}
+			after.SetBytes(buf[:])
+
+			Expect(after.Eq(&point)).To(BeTrue())
+		})
+
+		It("should marshal correctly with unnormalised y", func() {
+			point, _ := unnormalisedPoint(bady)
+			buf := [33]byte{}
+			point.PutBytes(buf[:])
+
+			after := Point{}
+			after.SetBytes(buf[:])
+
+			Expect(after.Eq(&point)).To(BeTrue())
 		})
 	})
 })
