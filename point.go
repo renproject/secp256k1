@@ -39,10 +39,10 @@ package secp256k1
 // generator as a non static variable. The use of the macro is copied from
 // group_impl.h.
 const secp256k1_ge secp256k1_generator = SECP256K1_GE_CONST(
-    0x79BE667EUL, 0xF9DCBBACUL, 0x55A06295UL, 0xCE870B07UL,
-    0x029BFCDBUL, 0x2DCE28D9UL, 0x59F2815BUL, 0x16F81798UL,
-    0x483ADA77UL, 0x26A3C465UL, 0x5DA4FBFCUL, 0x0E1108A8UL,
-    0xFD17B448UL, 0xA6855419UL, 0x9C47D08FUL, 0xFB10D4B8UL
+	0x79BE667EUL, 0xF9DCBBACUL, 0x55A06295UL, 0xCE870B07UL,
+	0x029BFCDBUL, 0x2DCE28D9UL, 0x59F2815BUL, 0x16F81798UL,
+	0x483ADA77UL, 0x26A3C465UL, 0x5DA4FBFCUL, 0x0E1108A8UL,
+	0xFD17B448UL, 0xA6855419UL, 0x9C47D08FUL, 0xFB10D4B8UL
 );
 
 // The c null pointer, which we define as it may be different from the go nil
@@ -251,9 +251,6 @@ func (p *Point) IsOnCurve() bool {
 }
 
 // Eq returns true if the two curve points are equal, and false otherwise.
-//
-// NOTE: This modifies the representation of p, but it will still represent the
-// same point on the elliptic curve.
 func (p *Point) Eq(other *Point) bool {
 	if p.IsInfinity() != other.IsInfinity() {
 		return false
@@ -263,15 +260,20 @@ func (p *Point) Eq(other *Point) bool {
 		return true
 	}
 
+	pCopy := *p
+	otherCopy := *other
+
 	// Scale p so that the z fields are equal. Once the z fields are equal, the
 	// points will be equal if and only if the x and y fields are equal.
 	var s C.secp256k1_fe
-	C.secp256k1_fe_inv(&s, &p.inner.z)
-	C.secp256k1_fe_mul(&s, &s, &other.inner.z)
-	C.secp256k1_gej_rescale(&p.inner, &s) // Modifies representation of p.
-	normalizeXYZ(&p.inner)
+	C.secp256k1_fe_inv(&s, &pCopy.inner.z)
+	C.secp256k1_fe_mul(&s, &s, &otherCopy.inner.z)
+	C.secp256k1_gej_rescale(&pCopy.inner, &s)
 
-	return fpEq(&p.inner.x, &other.inner.x) && fpEq(&p.inner.y, &other.inner.y)
+	normalizeXYZ(&pCopy.inner)
+	normalizeXYZ(&otherCopy.inner)
+
+	return fpEq(&pCopy.inner.x, &otherCopy.inner.x) && fpEq(&pCopy.inner.y, &otherCopy.inner.y)
 }
 
 // BaseExp computes the scalar multiplication of the canonical generator of the

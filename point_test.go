@@ -530,6 +530,35 @@ var _ = Describe("Point", func() {
 			Expect(func() { RandomPoint() }).To(Panic())
 		})
 	})
+
+	Context("regression tests", func() {
+		It("should handle point equality correctly", func() {
+			// Previously determined value that leads to the bad curve point.
+			scalarInt, _ := big.NewInt(0).SetString("104594261325654521456437189213270314662855164308234370710339505268369968110053", 10)
+			buf := [32]byte{}
+			scalarInt.FillBytes(buf[:])
+			scalar := Fn{}
+			scalar.SetB32(buf[:])
+
+			// Base exponentiation causes the `z` value in the gej representation to
+			// not be 1.
+			badPoint := Point{}
+			badPoint.BaseExp(&scalar)
+			tmp := Point{}
+
+			// Scaling causes the base to be rescaled, which for our specifically
+			// chosen base will cause the `x` and/or `y` values in the gej
+			// representation to be not normalised.
+			tmp.Scale(&badPoint, &scalar)
+
+			// At this stage we have a bad point that is in a non-normalised
+			// representation. We can get a normalised representation by
+			// calling a method that normalises the caller, for example `Eq`.
+			normalised := badPoint
+			normalised.Eq(&normalised)
+			Expect(normalised.Eq(&badPoint)).To(BeTrue())
+		})
+	})
 })
 
 func BenchmarkAdd(b *testing.B) {
