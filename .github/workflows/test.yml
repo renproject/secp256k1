@@ -7,7 +7,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-go@v2
         with:
-          go-version: "^1.14.0"
+          go-version: "^1.15.0"
       - uses: actions/cache@v1
         with:
           path: ~/go/pkg/mod
@@ -24,7 +24,6 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE
           export PATH=$PATH:$(go env GOPATH)/bin
-          go get github.com/onsi/gomega/matchers@v1.10.1
           go get -u golang.org/x/lint/golint
           go vet ./...
           golint ./...
