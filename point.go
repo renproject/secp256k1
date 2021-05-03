@@ -151,6 +151,11 @@ func (p *Point) XY() (Fp, Fp, error) {
 	var tmp C.secp256k1_ge
 
 	C.secp256k1_ge_set_gej(&tmp, &p.inner)
+	// Even though after the previous call `p` will represent the same curve
+	// point, the representation changes and can cause the x or y coordinates
+	// to be unnormalised. We therefore normalise the point which will also
+	// ensure that the returned xy coordinates are also normalised.
+	normalizeXYZ(&p.inner)
 	x.inner = tmp.x
 	y.inner = tmp.y
 	return x, y, nil
