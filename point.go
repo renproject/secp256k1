@@ -156,9 +156,10 @@ func (p *Point) XY() (Fp, Fp, error) {
 	// to be unnormalised. We therefore normalise the point which will also
 	// ensure that the returned xy coordinates are also normalised.
 	normalizeXYZ(&p.inner)
-	normalizeXYZ(&tmp.inner)
 	x.inner = tmp.x
 	y.inner = tmp.y
+	x.normalize()
+	y.normalize()
 	return x, y, nil
 }
 
