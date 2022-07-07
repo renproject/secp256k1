@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"testing"
 
-	ec "github.com/ethereum/go-ethereum/crypto/secp256k1"
+	"github.com/dustinxie/ecc"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -17,6 +17,8 @@ var _ = Describe("Point", func() {
 	trials := 1000
 
 	inf := NewPointInfinity()
+
+	params := ecc.P256k1()
 
 	copyLeftPadZero := func(dst, src []byte) {
 		for i := 0; i < 32-len(src); i++ {
@@ -94,7 +96,7 @@ var _ = Describe("Point", func() {
 
 			actual.BaseExpUnsafe(&scalar)
 
-			x, y = ec.S256().ScalarBaseMult(bs[:])
+			x, y = params.ScalarBaseMult(bs[:])
 			copyLeftPadZero(bs[:], x.Bytes())
 			xf.SetB32(bs[:])
 			copyLeftPadZero(bs[:], y.Bytes())
@@ -128,7 +130,7 @@ var _ = Describe("Point", func() {
 
 			actual.ScaleUnsafe(&a, &scalar)
 
-			x, y = ec.S256().ScalarMult(ax, ay, bs[:])
+			x, y = params.ScalarMult(ax, ay, bs[:])
 			copyLeftPadZero(bs[:], x.Bytes())
 			xf.SetB32(bs[:])
 			copyLeftPadZero(bs[:], y.Bytes())
@@ -186,7 +188,7 @@ var _ = Describe("Point", func() {
 
 			actual.AddUnsafe(&a, &b)
 
-			x, y = ec.S256().Add(ax, ay, bx, by)
+			x, y = params.Add(ax, ay, bx, by)
 			copyLeftPadZero(bs[:], x.Bytes())
 			xf.SetB32(bs[:])
 			copyLeftPadZero(bs[:], y.Bytes())
