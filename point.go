@@ -260,6 +260,15 @@ func (p *Point) IsOnCurve() bool {
 	return C.secp256k1_ge_is_valid_var(&tmp) != 0
 }
 
+// HasEvenY returns true if the y coordinate of the curve point is even.
+func (p *Point) HasEvenY() bool {
+	var tmp C.secp256k1_ge
+	C.secp256k1_ge_set_gej(&tmp, &p.inner)
+	C.secp256k1_fe_normalize_var(&tmp.y)
+
+	return C.secp256k1_fe_is_odd(&tmp.y) == 0
+}
+
 // Eq returns true if the two curve points are equal, and false otherwise.
 func (p *Point) Eq(other *Point) bool {
 	if p.IsInfinity() != other.IsInfinity() {
@@ -394,6 +403,28 @@ func (p *Point) Add(a, b *Point) {
 // implementation dependent.
 func (p *Point) AddUnsafe(a, b *Point) {
 	C.secp256k1_gej_add_var(&p.inner, &a.inner, &b.inner, C.null_ptr)
+
+	// The curve addition function doesn't make sure that the coordinates are
+	// normalized, so we need to do this manually.
+	normalizeXYZ(&p.inner)
+}
+
+// Negate computes the negation of the given curve point.
+func (p *Point) Negate(a *Point) {
+	if a == nil {
+		panic("expected first argument to be not be nil")
+	}
+
+	p.NegateUnsafe(a)
+}
+
+// NegateUnsafe computes the negation of given curve points.
+//
+// Unsafe: If this function receives nil arguments, the behaviour is
+// implementation dependent, because the definition of the NULL pointer in c is
+// implementation dependent.
+func (p *Point) NegateUnsafe(a *Point) {
+	C.secp256k1_gej_neg(&p.inner, &a.inner)
 
 	// The curve addition function doesn't make sure that the coordinates are
 	// normalized, so we need to do this manually.

@@ -216,6 +216,35 @@ var _ = Describe("Point", func() {
 		}
 	})
 
+	It("should correctly identify when a point has even y", func() {
+		var a Point
+		var ay Fp
+		var err error
+
+		for i := 0; i < trials; i++ {
+			a = RandomPoint()
+			_, ay, err = a.XY()
+			if err != nil {
+				panic(err)
+			}
+
+			Expect(ay.IsEven()).To(Equal(a.HasEvenY()))
+		}
+	})
+
+	It("should compute negations correctly", func() {
+		var a, neg Point
+
+		for i := 0; i < trials; i++ {
+			a = RandomPoint()
+			neg.Negate(&a)
+
+			a.Add(&a, &neg)
+
+			Expect(a.IsInfinity())
+		}
+	})
+
 	//
 	// Marshalling
 	//
